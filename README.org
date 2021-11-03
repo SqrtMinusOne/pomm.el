@@ -1,0 +1,3 @@
+#+begin_src emacs-lisp
+(setq alert-default-style 'libnotify)
+#+end_src
