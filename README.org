@@ -1,3 +1,11 @@
 #+begin_src emacs-lisp
 (setq alert-default-style 'libnotify)
 #+end_src
+
+#+begin_src emacs-lisp
+(add-to-list 'mode-line-misc-info '(:eval pomm-current-mode-line-string))
+(add-hook 'pomm-on-tick-hook 'pomm-update-mode-line-string)
+(add-hook 'pomm-on-tick-hook 'force-mode-line-update)
+(add-hook 'pomm-on-status-changed-hook 'pomm-update-mode-line-string)
+(add-hook 'pomm-on-status-changed-hook 'force-mode-line-update)
+#+end_src

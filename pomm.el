@@ -81,6 +81,23 @@
   :group 'pomm
   :type 'string)
 
+(defcustom pomm-remaining-time-format "%m:%.2s"
+  "Format the time, remaining in the period.
+
+The format is the same as in `format-seconds'"
+  :group 'pomm
+  :type 'string)
+
+(defcustom pomm-on-tick-hook nil
+  "A hook to run on a tick when the timer is running."
+  :group 'pomm
+  :type 'hook)
+
+(defcustom pomm-on-status-changed-hook nil
+  "A hook to run on status change."
+  :group 'pomm
+  :type 'hook)
+
 (defvar pomm--state nil
   "Current state of pomm.el.
 
@@ -99,13 +116,16 @@ Current period is also an alist with the following keys:
 (defvar pomm--timer nil
   "A variable for the pomm timer.")
 
+(defvar pomm-current-mode-line-string nil
+  "Current mode-line of the pomodoro timer.")
+
 (defun pomm-reset ()
   "Reset the pomodoro timer."
   (interactive)
   (setq pomm--state
-        `((status . stopped)
-          (current . nil)
-          (history . nil)
+        `((status . ,'stopped)
+          (current . ,nil)
+          (history . ,nil)
           (last-changed-time ,(time-convert nil 'integer)))))
 
 (defun pomm--init-state ()
@@ -209,11 +229,47 @@ KIND is the same as in `pomm--state'"
 (defun pomm--on-tick ()
   "A function to be ran on a timer tick."
   (pcase (alist-get 'status pomm--state)
-    ('stopped (when pomm--timer (cancel-timer pomm--timer)))
+    ('stopped (when pomm--timer
+                (cancel-timer pomm--timer)
+                (setq pomm--timer nil)))
     ('paused nil)
     ('running
-     (when (pomm--need-switch-p)
-       (pomm--switch-to-next)))))
+     (progn
+       (when (pomm--need-switch-p)
+         (pomm--switch-to-next))
+       (run-hooks 'pomm-on-tick-hook)))))
+
+(defun pomm--get-time-remaning ()
+  "Get time remaining in the current pomodoro period."
+  (+
+   (+ (alist-get 'effective-start-time (alist-get 'current pomm--state))
+      (pomm--get-kind-length
+       (alist-get 'kind (alist-get 'current pomm--state))))
+   (- (time-convert nil 'integer))
+   (if (eq (alist-get 'status pomm--state) 'paused)
+       (+ (-
+           (time-convert nil 'integer)
+           (alist-get 'last-changed-time pomm--state)))
+     0)))
+
+(defun pomm-format-mode-line ()
+  "Format a string for the mode line."
+  (let ((current-status (alist-get 'status pomm--state)))
+    (if (or (eq current-status 'stopped) (not (alist-get 'current pomm--state)))
+        ""
+      (let* ((current-kind (alist-get 'kind (alist-get 'current pomm--state)))
+             (time-remaining (pomm--get-time-remaning)))
+        (format "[%s] %s "
+                (concat
+                 (symbol-name current-kind)
+                 (if (eq current-status 'paused)
+                     ":paused"
+                   ""))
+                (format-seconds pomm-remaining-time-format time-remaining))))))
+
+(defun pomm-update-mode-line-string ()
+  "Update the modeline string."
+  (setq pomm-current-mode-line-string (pomm-format-mode-line)))
 
 ;;;###autoload
 (defun pomm-start ()
@@ -229,6 +285,7 @@ KIND is the same as in `pomm--state'"
           (+ (alist-get 'effective-start-time (alist-get 'current pomm--state))
              (- (time-convert nil 'integer) (alist-get 'last-changed-time pomm--state)))
           (alist-get 'last-changed-time pomm--state) (time-convert nil 'integer))))
+  (run-hooks 'pomm-on-status-changed-hook)
   (unless pomm--timer
     (setq pomm--timer (run-with-timer 0 1 'pomm--on-tick))))
 
@@ -238,13 +295,15 @@ KIND is the same as in `pomm--state'"
   (pomm--store-current-to-history)
   (setf (alist-get 'status pomm--state) 'stopped
         (alist-get 'current pomm--state) nil
-        (alist-get 'last-changed-time pomm--state) (time-convert nil 'integer)))
+        (alist-get 'last-changed-time pomm--state) (time-convert nil 'integer))
+  (run-hooks 'pomm-on-status-changed-hook))
 
 (defun pomm-pause ()
   "Pause the pomodoro timer."
   (interactive)
   (setf (alist-get 'status pomm--state) 'paused
-        (alist-get 'last-changed-time pomm--state) (time-convert nil 'integer)))
+        (alist-get 'last-changed-time pomm--state) (time-convert nil 'integer))
+  (run-hooks 'pomm-on-status-changed-hook))
 
 (provide 'pomm)
 ;;; pomm.el ends here
