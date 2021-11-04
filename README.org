@@ -1,7 +1,37 @@
+#+TITLE: pomm.el
+
+Yet another implementation of a [[https://en.wikipedia.org/wiki/Pomodoro_Technique][pomodoro timer]] for Emacs.
+
+This particular package features:
+- Managing the timer with the excellent [[https://github.com/magit/transient/blob/master/lisp/transient.el][transient.el]].
+- A persistent state between Emacs sessions.
+  The timer state isn't reset if you close Emacs. Also, the state file can be syncronized between machines.
+
+None of the available [[*Alternatives][alternatives]] were doing quite what I wanted, and the idea of the timer is quite simple, so I figured I'd implement one myself.
+
+* Setup
+While the package is available only this this repository, one way to install is to clone the repository, add the package to the =load-path= and load it with =require=:
+#+begin_src emacs-lisp
+(require 'pomm)
+#+end_src
+
+My preferred way is =use-package= with =straight.el=:
+#+begin_src emacs-lisp
+(use-package pomm
+  :straight (:host github :repo "SqrtMinusOne/pomm.el")
+  :commands (pomm))
+#+end_src
+
+The package requires Emacs 27.1, because the time API of the previous versions is kinda crazy and 27.1 has =time-convert=.
+
+** Alerts
+The package sends alerts via =alert.el=. The default style of alert is a plain =message=, but if you want an actual notification, set =alert-default-style= accordingly:
 #+begin_src emacs-lisp
 (setq alert-default-style 'libnotify)
 #+end_src
 
+** Modeline
+If you want the timer to display in the modeline, add the following code to your config:
 #+begin_src emacs-lisp
 (add-to-list 'mode-line-misc-info '(:eval pomm-current-mode-line-string))
 (add-hook 'pomm-on-tick-hook 'pomm-update-mode-line-string)
@@ -9,3 +39,56 @@
 (add-hook 'pomm-on-status-changed-hook 'pomm-update-mode-line-string)
 (add-hook 'pomm-on-status-changed-hook 'force-mode-line-update)
 #+end_src
+
+This is quite verbose, but as I don't use this feature, I want to avoid adding an unnecesary load to my Emacs.
+
+** Polybar module
+If you want to display the pomodoro status in something like polybar, you can add the following lines to your config:
+#+begin_src emacs-lisp
+(add-hook 'pomm-on-tick-hook 'pomm-update-mode-line-string)
+(add-hook 'pomm-on-status-changed-hook 'pomm-update-mode-line-string)
+#+end_src
+
+Create a script like this:
+#+begin_src bash
+if ps -e | grep emacs >> /dev/null; then
+    emacsclient --eval "pomm-current-mode-line-string" | xargs echo -e
+fi
+#+end_src
+
+And add a polybar module definition to your polybar config:
+#+begin_src conf-windows
+[module/pomm]
+type = custom/script
+exec = /home/pavel/bin/polybar/pomm.sh
+interval = 1
+#+end_src
+
+* Usage
+Run =M-x pomm= to open the transient buffer.
+
+The listed commands are rather self-descriptive and match the pomodoro ideology.
+
+The timer can have 3 states:
+- *Stopped*.
+  Can be started with "s" or =M-x pomm-start=. A new iteration of the timer will be started.
+- *Paused*. Can be continuted with "s" / =M-x pomm-start= or stopped competely with "S" / =M-x pomm-stop=.
+- *Running*. Can be paused with "p" / =M-x pomm-pause= or stopped with "S" / =M-x pomm-stop=.
+
+The state of the timer can be reset with "R" or =M-x pomm-reset=.
+
+"U" updates the transient buffer. The update is manual because I didn't figure out how to automate this, and I think this is not /really/ necessary.
+
+Some settings are available in the transient buffer, but you can customize the relevant variables to make them permanent. Check =M-x customize-group= =pomm= for more information.
+
+* Alternatives
+There is a number of packages with a similar purpose, here are some:
+- [[https://github.com/marcinkoziej/org-pomodoro/tree/master][org-pomodoro]]
+- [[https://github.com/TatriX/pomidor/][pomidor]]
+- [[https://github.com/baudtack/pomodoro.el/][pomodoro.el]]
+- [[https://github.com/konr/tomatinho/][tomatinho]]
+- [[https://github.com/ferfebles/redtick][redtick]]
+Be sure to check those out if this one doesn't quite fit your workflow!
+
+* P.S.
+The package name is not an abbreviation. I just hope it doesn't mean something horrible in some language I don't know.
