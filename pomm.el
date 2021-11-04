@@ -83,6 +83,16 @@
   :group 'pomm
   :type 'string)
 
+(defcustom pomm-history-reset-hour 0
+  "An hour on which the history will be reset.
+
+Whenever the pomodoro timer is intializing, it will try to read the
+state file from `pomm-state-file-location'.  If there are records that
+were made before this hour, they will be cleared, so that the history
+contains records only from the current day."
+  :group 'pomm
+  :type 'integer)
+
 (defcustom pomm-remaining-time-format "%m:%.2s"
   "Format the time, remaining in the period.
 
@@ -145,8 +155,40 @@ Updated by `pomm-update-mode-line-string'.")
   (setf (alist-get 'status pomm--state) 'stopped))
 
 (defun pomm--init-state ()
-  "Initialize the pomodoro timer state."
-  (pomm--do-reset))                     ;; TODO
+  "Initialize the pomodoro timer state.
+
+This function has to be run only once, at the first start of the timer."
+  (add-hook 'pomm-on-status-changed-hook #'pomm--save-state)
+  (if (or (not (file-exists-p pomm-state-file-location))
+          (not pomm-state-file-location))
+      (pomm--do-reset)
+    (with-temp-buffer
+      (insert-file-contents pomm-state-file-location)
+      (let ((data (buffer-substring (point-min) (point-max))))
+        (if (not (string-empty-p data))
+            (setq pomm--state (car (read-from-string data)))
+          (pomm--do-reset)))))
+  (pomm--cleanup-old-history))
+
+(defun pomm--save-state ()
+  "Save the current pomodoro timer state."
+  (when pomm-state-file-location
+    (with-temp-file pomm-state-file-location
+      (insert (prin1-to-string pomm--state)))))
+
+(defun pomm--cleanup-old-history ()
+  "Clear history of previous days from the pomodoro timer."
+  (let ((cleanup-time (decode-time)))
+    (setf (decoded-time-second cleanup-time) 0
+          (decoded-time-minute cleanup-time) 0
+          (decoded-time-hour cleanup-time) pomm-history-reset-hour)
+
+    (let ((cleanup-timestamp (time-convert (encode-time cleanup-time) 'integer)))
+      (setf (alist-get 'history pomm--state)
+            (seq-filter
+             (lambda (item)
+               (> (alist-get 'start-time item) cleanup-timestamp))
+             (alist-get 'history pomm--state))))))
 
 (defun pomm-reset ()
   "Reset the pomodoro timer."
@@ -249,7 +291,8 @@ The condition is: (effective-start-time + length) < now."
                   (iteration . ,next-iteration)))
           (pomm--dispatch-notification next-kind))
       (setf (alist-get 'current pomm--state) nil)
-      (setf (alist-get 'status pomm--state) 'stopped))))
+      (setf (alist-get 'status pomm--state) 'stopped))
+    (pomm--save-state)))
 
 (defun pomm--on-tick ()
   "A function to be ran on a timer tick."
@@ -487,6 +530,12 @@ The class doesn't actually have any value, but this is necessary for transient."
   :class 'pomm--transient-current
   :key "~~2")
 
+(defun pomm--transient-update ()
+  "Noop."
+  ;; I can't figure out why a lambda in the transient doesn't work
+  ;; when the package is loaded.
+  (interactive))
+
 (transient-define-prefix pomm-transient ()
   ["Settings"
    (pomm--set-short-break-period)
@@ -499,7 +548,7 @@ The class doesn't actually have any value, but this is necessary for transient."
    ("S" "Stop the timer" pomm-stop :transient t)
    ("p" "Pause the timer" pomm-pause :transient t)
    ("R" "Reset" pomm-reset :transient t)
-   ("u" "Update" (lambda () (interactive)) :transient t)
+   ("u" "Update" pomm--transient-update :transient t)
    ("q" "Quit" transient-quit-one)]
   ["Status"
    (pomm--transient-current-suffix)]
