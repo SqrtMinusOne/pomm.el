@@ -25,7 +25,16 @@
 
 ;;; Commentary:
 
-;; TODO
+;; An implementation of a Pomodoro timer for Emacs.  Distintive features
+;; of this particular implementation:
+;; - Managing the timer with transient.el (`pomm' command)
+;; - Persistent state between Emacs sessions.
+;;   So one could close & reopen Emacs without interruption the timer.
+;;
+;; Take a look at `pomm-update-mode-line-string' on how to setup this
+;; package with a modeline.
+;; Also take a look at README at
+;; <https://github.com/SqrtMinusOne/pomm.el> for more information.
 
 ;;; Code:
 (require 'alert)
@@ -86,7 +95,7 @@
 (defcustom pomm-history-reset-hour 0
   "An hour on which the history will be reset.
 
-Whenever the pomodoro timer is intializing, it will try to read the
+Whenever the Pomodoro timer is initializing, it will try to read the
 state file from `pomm-state-file-location'.  If there are records that
 were made before this hour, they will be cleared, so that the history
 contains records only from the current day."
@@ -94,7 +103,7 @@ contains records only from the current day."
   :type 'integer)
 
 (defcustom pomm-remaining-time-format "%m:%.2s"
-  "Format the time, remaining in the period.
+  "Format the time remaining in the period.
 
 The format is the same as in `format-seconds'"
   :group 'pomm
@@ -106,31 +115,36 @@ The format is the same as in `format-seconds'"
   :type 'hook)
 
 (defcustom pomm-on-status-changed-hook nil
-  "A hook to run on status change."
+  "A hook to run on a status change."
+  :group 'pomm
+  :type 'hook)
+
+(defcustom pomm-on-period-changed-hook nil
+  "A hook to run on a period status change."
   :group 'pomm
   :type 'hook)
 
 (defvar pomm--state nil
-  "Current state of pomm.el.
+  "The current state of pomm.el.
 
 This is an alist of with the following keys:
 - status: either 'stopped, 'paused or 'running
 - current: an alist with a current period
 - history: a list with today's history
-- last-changed-time: a timestamp of a last change in status
+- last-changed-time: a timestamp of the last change in status
 
-Current period is also an alist with the following keys:
+'current is also an alist with the following keys:
 - kind: either 'short-break, 'long-break or 'work
 - start-time: start timestamp
 - effective-start-time: start timestamp, corrected for pauses
-- iteration: number the current pomodoro iteration
+- iteration: number the current Pomodoro iteration
 
 History is a list of alists with the following keys:
 - kind: same as in current
 - iteration
 - start-time: start timestamp
 - end-time: end timestamp
-- paused-time: time spent it a paused state")
+- paused-time: time spent in a paused state")
 
 (defvar pomm--timer nil
   "A variable for the pomm timer.")
@@ -155,9 +169,9 @@ Updated by `pomm-update-mode-line-string'.")
   (setf (alist-get 'status pomm--state) 'stopped))
 
 (defun pomm--init-state ()
-  "Initialize the pomodoro timer state.
+  "Initialize the Pomodoro timer state.
 
-This function has to be run only once, at the first start of the timer."
+This function is meant to be ran only once, at the first start of the timer."
   (add-hook 'pomm-on-status-changed-hook #'pomm--save-state)
   (if (or (not (file-exists-p pomm-state-file-location))
           (not pomm-state-file-location))
@@ -171,13 +185,13 @@ This function has to be run only once, at the first start of the timer."
   (pomm--cleanup-old-history))
 
 (defun pomm--save-state ()
-  "Save the current pomodoro timer state."
+  "Save the current Pomodoro timer state."
   (when pomm-state-file-location
     (with-temp-file pomm-state-file-location
       (insert (prin1-to-string pomm--state)))))
 
 (defun pomm--cleanup-old-history ()
-  "Clear history of previous days from the pomodoro timer."
+  "Clear history of previous days from the Pomodoro timer."
   (let ((cleanup-time (decode-time)))
     (setf (decoded-time-second cleanup-time) 0
           (decoded-time-minute cleanup-time) 0
@@ -191,7 +205,7 @@ This function has to be run only once, at the first start of the timer."
              (alist-get 'history pomm--state))))))
 
 (defun pomm-reset ()
-  "Reset the pomodoro timer."
+  "Reset the Pomodoro timer."
   (interactive)
   (when (y-or-n-p "Are you sure you want to reset the Pomodoro timer? ")
     (pomm--do-reset)))
@@ -208,7 +222,7 @@ KIND is the same as in `pomm--state'"
    :title "Pomodoro"))
 
 (defun pomm--new-iteration ()
-  "Start a new iteration of the pomodoro timer."
+  "Start a new iteration of the Pomodoro timer."
   (setf (alist-get 'current pomm--state)
         `((kind . work)
           (start-time . ,(time-convert nil 'integer))
@@ -224,7 +238,7 @@ KIND is the same as in `pomm--state'"
   (pomm--dispatch-notification 'work))
 
 (defun pomm--get-kind-length (kind)
-  "Get a length of period KIND in seconds."
+  "Get the length of a period of type KIND in seconds."
   (* 60
      (pcase kind
        ('short-break pomm-short-break-period)
@@ -242,7 +256,7 @@ The condition is: (effective-start-time + length) < now."
      (time-convert nil 'integer)))
 
 (defun pomm--store-current-to-history ()
-  "Store the current pomodoro state to the history."
+  "Store the current pomodoro period to the history list."
   (let* ((current-kind (alist-get 'kind (alist-get 'current pomm--state)))
          (current-iteration (alist-get 'iteration (alist-get 'current pomm--state)))
          (start-time (alist-get 'start-time (alist-get 'current pomm--state)))
@@ -292,7 +306,8 @@ The condition is: (effective-start-time + length) < now."
           (pomm--dispatch-notification next-kind))
       (setf (alist-get 'current pomm--state) nil)
       (setf (alist-get 'status pomm--state) 'stopped))
-    (pomm--save-state)))
+    (pomm--save-state)
+    (run-hooks 'pomm-on-status-changed-hook)))
 
 (defun pomm--on-tick ()
   "A function to be ran on a timer tick."
@@ -345,7 +360,7 @@ paused-time := now - last-changed-time"
 
 This sets the variable `pomm-current-mode-line-string' with a value
 from `pomm-format-mode-line'.  This is made so to minimize the load on
-the modeline, because otherwise updates may be quite frequent.
+the modeline, because otherwise the updates may be quite frequent.
 
 To add this to the modeline, add the following code to your config:
 \(add-to-list 'mode-line-misc-info '\(:eval pomm-current-mode-line-string\)')
@@ -499,7 +514,7 @@ The class doesn't actually have any value, but this is necessary for transient."
   "Format the history list for the transient buffer."
   (if (not (alist-get 'history pomm--state))
       "No history yet"
-    (let ((previous-iteration -1))
+    (let ((previous-iteration 1000))
       (mapconcat
        (lambda (item)
          (let ((kind (alist-get 'kind item))
@@ -508,8 +523,13 @@ The class doesn't actually have any value, but this is necessary for transient."
                (end-time (alist-get 'end-time item))
                (paused-time (alist-get 'paused-time item)))
            (concat
-            (if (> iteration previous-iteration)
-                (progn (setq previous-iteration iteration) "\n") "")
+            (if (< iteration previous-iteration)
+                (let ((is-first (= previous-iteration 1000)))
+                  (setq previous-iteration iteration)
+                  (if is-first
+                      ""
+                    "\n"))
+              "")
             (format "[%02d] " iteration)
             (propertize
              (format "%12s  " (upcase (symbol-name kind)))
@@ -523,7 +543,7 @@ The class doesn't actually have any value, but this is necessary for transient."
 (transient-define-infix pomm--transient-history-suffix ()
   :class 'pomm--transient-history
   ;; A dummy key. Seems to be necessary for transient.
-  ;; Just don't press ~ while in buffer.
+  ;; Just don't press ~ while in the buffer.
   :key "~~1")
 
 (transient-define-infix pomm--transient-current-suffix ()
@@ -557,9 +577,20 @@ The class doesn't actually have any value, but this is necessary for transient."
 
 ;;;###autoload
 (defun pomm ()
-  "A Pomodoro timer.
+  "A Pomodoro technique timer.
 
-This command initialized the state of timer and triggers the transient buffer."
+This command initializes the timer and triggers the transient buffer.
+
+The timer can have 3 states:
+- Stopped.
+  Can be started with 's' or `pomm-start'.  A new iteration of the
+  timer will be started.
+- Paused.
+  Can be continuted with 's' / `pomm-start' or stopped competely with
+  'S' / `pomm-stop'.
+- Running.
+  Can be paused with 'p' / `pomm-pause' or stopped with 'S' /
+  `pomm-stop'."
   (interactive)
   (unless pomm--state
     (pomm--init-state))

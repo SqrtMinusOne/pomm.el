@@ -1,16 +1,16 @@
-#+TITLE: pomm.el
-
 Yet another implementation of a [[https://en.wikipedia.org/wiki/Pomodoro_Technique][pomodoro timer]] for Emacs.
+
+[[./img/screenshot.png]]
 
 This particular package features:
 - Managing the timer with the excellent [[https://github.com/magit/transient/blob/master/lisp/transient.el][transient.el]].
-- A persistent state between Emacs sessions.
-  The timer state isn't reset if you close Emacs. Also, the state file can be syncronized between machines.
+- Persistent state between Emacs sessions.
+  The timer state isn't reset if you close Emacs. Also, the state file can be synchronized between machines.
 
 None of the available [[*Alternatives][alternatives]] were doing quite what I wanted, and the idea of the timer is quite simple, so I figured I'd implement one myself.
 
 * Setup
-While the package is available only this this repository, one way to install is to clone the repository, add the package to the =load-path= and load it with =require=:
+While the package is available only in this repository, one way to install is to clone the repository, add the package to the =load-path= and load it with =require=:
 #+begin_src emacs-lisp
 (require 'pomm)
 #+end_src
@@ -22,7 +22,7 @@ My preferred way is =use-package= with =straight.el=:
   :commands (pomm))
 #+end_src
 
-The package requires Emacs 27.1, because the time API of the previous versions is kinda crazy and 27.1 has =time-convert=.
+The package requires Emacs 27.1 because the time API of the previous versions is kinda crazy and 27.1 has =time-convert=.
 
 ** Alerts
 The package sends alerts via =alert.el=. The default style of alert is a plain =message=, but if you want an actual notification, set =alert-default-style= accordingly:
@@ -40,10 +40,10 @@ If you want the timer to display in the modeline, add the following code to your
 (add-hook 'pomm-on-status-changed-hook 'force-mode-line-update)
 #+end_src
 
-This is quite verbose, but as I don't use this feature, I want to avoid adding an unnecesary load to my Emacs.
+This is quite verbose, but as I don't use this feature, I want to avoid adding an unnecessary load to my Emacs.
 
 ** Polybar module
-If you want to display the pomodoro status in something like polybar, you can add the following lines to your config:
+If you want to display the Pomodoro status in something like polybar, you can add the following lines to your config:
 #+begin_src emacs-lisp
 (add-hook 'pomm-on-tick-hook 'pomm-update-mode-line-string)
 (add-hook 'pomm-on-status-changed-hook 'pomm-update-mode-line-string)
@@ -64,14 +64,15 @@ exec = /home/pavel/bin/polybar/pomm.sh
 interval = 1
 #+end_src
 
+** State file location
+The package stores the current state to a file by the path =pomm-state-file-location=, which is =emacs.d/pomm= by default. Set it to wherever you like.
 * Usage
 Run =M-x pomm= to open the transient buffer.
 
-The listed commands are rather self-descriptive and match the pomodoro ideology.
+The listed commands are rather self-descriptive and match the Pomodoro ideology.
 
 The timer can have 3 states:
-- *Stopped*.
-  Can be started with "s" or =M-x pomm-start=. A new iteration of the timer will be started.
+- *Stopped*. Can be started with "s" or =M-x pomm-start=. A new iteration of the timer will be started.
 - *Paused*. Can be continuted with "s" / =M-x pomm-start= or stopped competely with "S" / =M-x pomm-stop=.
 - *Running*. Can be paused with "p" / =M-x pomm-pause= or stopped with "S" / =M-x pomm-stop=.
 
