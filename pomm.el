@@ -5,7 +5,7 @@
 ;; Author: Korytov Pavel <thexcloud@gmail.com>
 ;; Maintainer: Korytov Pavel <thexcloud@gmail.com>
 ;; Version: 0.1.0
-;; Package-Requires: ((emacs "27.1") (alert "1.2") (seq "2.22"))
+;; Package-Requires: ((emacs "27.1") (alert "1.2") (seq "2.22") (transient "0.2.0"))
 ;; Homepage: https://github.com/SqrtMinusOne/pomm.el
 
 ;; This file is NOT part of GNU Emacs.
@@ -30,6 +30,8 @@
 ;;; Code:
 (require 'alert)
 (require 'seq)
+(require 'eieio)
+(require 'transient)
 
 (defgroup pomm nil
   "Yet another Pomodoro timer implementation."
@@ -119,18 +121,28 @@ Current period is also an alist with the following keys:
 (defvar pomm-current-mode-line-string nil
   "Current mode-line of the pomodoro timer.")
 
-(defun pomm-reset ()
-  "Reset the pomodoro timer."
-  (interactive)
+(defun pomm--do-reset ()
+  "Reset the pomodoro timer state."
+  (when pomm--timer
+    (cancel-timer pomm--timer)
+    (setq pomm--timer nil))
   (setq pomm--state
         `((status . ,'stopped)
           (current . ,nil)
           (history . ,nil)
-          (last-changed-time ,(time-convert nil 'integer)))))
+          (last-changed-time ,(time-convert nil 'integer)))
+        pomm-current-mode-line-string "")
+  (setf (alist-get 'status pomm--state) 'stopped))
 
 (defun pomm--init-state ()
   "Initialize the pomodoro timer state."
-  (pomm-reset))
+  (pomm--do-reset))                     ;; TODO
+
+(defun pomm-reset ()
+  "Reset the pomodoro timer."
+  (interactive)
+  (when (y-or-n-p "Are you sure you want to reset the Pomodoro timer? ")
+    (pomm--do-reset)))
 
 (defun pomm--dispatch-notification (kind)
   "Dispatch a notification about a start of a period.
@@ -208,7 +220,7 @@ KIND is the same as in `pomm--state'"
                      ((and (eq current-kind 'work)
                            (< work-periods pomm-number-of-periods))
                       'short-break)
-                     (_ 'work)))
+                     (t 'work)))
          (next-iteration (if (eq current-kind 'long-break)
                              (+ current-iteration 1)
                            current-iteration)))
@@ -228,6 +240,7 @@ KIND is the same as in `pomm--state'"
 
 (defun pomm--on-tick ()
   "A function to be ran on a timer tick."
+
   (pcase (alist-get 'status pomm--state)
     ('stopped (when pomm--timer
                 (cancel-timer pomm--timer)
@@ -242,7 +255,7 @@ KIND is the same as in `pomm--state'"
 (defun pomm--get-time-remaning ()
   "Get time remaining in the current pomodoro period."
   (+
-   (+ (alist-get 'effective-start-time (alist-get 'current pomm--state))
+   (+ (or (alist-get 'effective-start-time (alist-get 'current pomm--state)) 0)
       (pomm--get-kind-length
        (alist-get 'kind (alist-get 'current pomm--state))))
    (- (time-convert nil 'integer))
@@ -304,6 +317,145 @@ KIND is the same as in `pomm--state'"
   (setf (alist-get 'status pomm--state) 'paused
         (alist-get 'last-changed-time pomm--state) (time-convert nil 'integer))
   (run-hooks 'pomm-on-status-changed-hook))
+
+;;;; Transient
+
+(transient-define-infix pomm--set-short-break-period ()
+  :class 'transient-lisp-variable
+  :variable 'pomm-short-break-period
+  :key "-s"
+  :description "Short break period (minutes):"
+  :reader (lambda (&rest _)
+            (read-number "Number of minutes for a short break period: "
+                         pomm-short-break-period)))
+
+(transient-define-infix pomm--set-long-break-period ()
+  :class 'transient-lisp-variable
+  :variable 'pomm-long-break-period
+  :key "-l"
+  :description "Long break period (minutes):"
+  :reader (lambda (&rest _)
+            (read-number "Number of minutes for a long break period: "
+                         pomm-long-break-period)))
+
+(transient-define-infix pomm--set-work-period ()
+  :class 'transient-lisp-variable
+  :variable 'pomm-work-period
+  :key "-w"
+  :description "Work period (minutes):"
+  :reader (lambda (&rest _)
+            (read-number "Number of minutes for a work period: "
+                         pomm-work-period)))
+
+(transient-define-infix pomm--set-number-of-periods ()
+  :class 'transient-lisp-variable
+  :variable 'pomm-number-of-periods
+  :key "-p"
+  :description "Number of work periods before long break: "
+  :reader (lambda (&rest _)
+            (read-number "Number of work periods before long break:"
+                         pomm-number-of-periods)))
+
+(defclass pomm--transient-current (transient-suffix)
+  (transient :initform t))
+
+(cl-defmethod transient-init-value ((obj pomm--transient-current))
+  nil)
+
+(defun pomm--get-kind-face (kind)
+  (pcase kind
+    ('work 'success)
+    ('short-break 'warning)
+    ('long-break 'error)))
+
+(cl-defmethod transient-format ((obj pomm--transient-current))
+  "hello!"
+  (let ((status (alist-get 'status pomm--state)))
+    (if (or (eq 'stopped status) (not (alist-get 'current pomm--state)))
+        "The timer is not running"
+      (let* ((kind (alist-get 'kind (alist-get 'current pomm--state)))
+             (start-time (alist-get 'start-time (alist-get 'current pomm--state)))
+             (iteration (alist-get 'iteration (alist-get 'current pomm--state)))
+             (time-remaining (pomm--get-time-remaning)))
+        (concat
+         (format "Iteration #%d. " iteration)
+         "State: "
+         (propertize
+          (upcase (symbol-name kind))
+          'face
+          (pomm--get-kind-face kind))
+         (if (eq status 'paused)
+             (propertize
+              " [PAUSED]"
+              'face 'warning)
+           "")
+         ". Started at: "
+         (propertize
+          (format-time-string "%H:%M:%S" (seconds-to-time start-time))
+          'face 'success)
+         ". Time remaining: "
+         (propertize
+          (format-seconds "%.2h:%.2m:%.2s" time-remaining)
+          'face 'success))))))
+
+(defclass pomm--transient-history (transient-suffix)
+  (transient :initform t))
+
+(cl-defmethod transient-init-value ((obj pomm--transient-history))
+  nil)
+
+(cl-defmethod transient-format ((obj pomm--transient-history))
+  "hello!"
+  (if (not (alist-get 'history pomm--state))
+      "No history yet"
+    (let ((previous-iteration -1))
+      (mapconcat
+       (lambda (item)
+         (let ((kind (alist-get 'kind item))
+               (iteration (alist-get 'iteration item))
+               (start-time (alist-get 'start-time item))
+               (end-time (alist-get 'end-time item))
+               (paused-time (alist-get 'paused-time item)))
+           (concat
+            (if (> iteration previous-iteration)
+                (progn (setq previous-iteration iteration) "\n") "")
+            (format "[%02d] " iteration)
+            (propertize
+             (format "%12s  " (upcase (symbol-name kind)))
+             'face (pomm--get-kind-face kind))
+            (format-time-string "%H:%M" (seconds-to-time start-time))
+            "-"
+            (format-time-string "%H:%M" (seconds-to-time end-time)))))
+       (alist-get 'history pomm--state)
+       "\n"))))
+
+(transient-define-infix pomm--transient-history-suffix ()
+  :class 'pomm--transient-history
+  :key "~~1")
+
+(transient-define-infix pomm--transient-current-suffix ()
+  :class 'pomm--transient-current
+  :key "~~2")
+
+;;;###autoload (autoload 'pomm "Pomodoro timer" nil t)
+(transient-define-prefix pomm ()
+  ["Settings"
+   (pomm--set-short-break-period)
+   (pomm--set-long-break-period)
+   (pomm--set-work-period)
+   (pomm--set-number-of-periods)]
+  ["Commands"
+   :class transient-row
+   ("s" "Start the timer" pomm-start :transient t)
+   ("S" "Stop the timer" pomm-stop :transient t)
+   ("p" "Pause the timer" pomm-pause :transient t)
+   ("R" "Reset" pomm-reset :transient t)
+   ("u" "Update" (lambda () (interactive)) :transient t)
+   ("q" "Quit" transient-quit-one)]
+  ["Status"
+   (pomm--transient-current-suffix)]
+  ["History"
+   (pomm--transient-history-suffix)])
 
 (provide 'pomm)
 ;;; pomm.el ends here
