@@ -149,7 +149,7 @@ History is a list of alists with the following keys:
 (defvar pomm--timer nil
   "A variable for the pomm timer.")
 
-(defvar pomm-current-mode-line-string nil
+(defvar pomm-current-mode-line-string ""
   "Current mode-line string of the pomodoro timer.
 
 Updated by `pomm-update-mode-line-string'.")

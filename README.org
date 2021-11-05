@@ -9,7 +9,7 @@ This particular package features:
 
 None of the available [[*Alternatives][alternatives]] were doing quite what I wanted, and the idea of the timer is quite simple, so I figured I'd implement one myself.
 
-* Setup
+* Installation
 While the package is available only in this repository, one way to install is to clone the repository, add the package to the =load-path= and load it with =require=:
 #+begin_src emacs-lisp
 (require 'pomm)
@@ -23,6 +23,22 @@ My preferred way is =use-package= with =straight.el=:
 #+end_src
 
 The package requires Emacs 27.1 because the time API of the previous versions is kinda crazy and 27.1 has =time-convert=.
+* Usage
+Run =M-x pomm= to open the transient buffer.
+
+The listed commands are rather self-descriptive and match the Pomodoro ideology.
+
+The timer can have 3 states:
+- *Stopped*. Can be started with "s" or =M-x pomm-start=. A new iteration of the timer will be started.
+- *Paused*. Can be continuted with "s" / =M-x pomm-start= or stopped competely with "S" / =M-x pomm-stop=.
+- *Running*. Can be paused with "p" / =M-x pomm-pause= or stopped with "S" / =M-x pomm-stop=.
+
+The state of the timer can be reset with "R" or =M-x pomm-reset=.
+
+"U" updates the transient buffer. The update is manual because I didn't figure out how to automate this, and I think this is not /really/ necessary.
+
+* Customization
+Some settings are available in the transient buffer, but you can customize the relevant variables to make them permanent. Check =M-x customize-group= =pomm= for more information.
 
 ** Alerts
 The package sends alerts via =alert.el=. The default style of alert is a plain =message=, but if you want an actual notification, set =alert-default-style= accordingly:
@@ -52,7 +68,7 @@ If you want to display the Pomodoro status in something like polybar, you can ad
 Create a script like this:
 #+begin_src bash
 if ps -e | grep emacs >> /dev/null; then
-    emacsclient --eval "pomm-current-mode-line-string" | xargs echo -e
+    emacsclient --eval "(if (boundp 'pomm-current-mode-line-string) pomm-current-mode-line-string \"\") " | xargs echo -e
 fi
 #+end_src
 
@@ -66,22 +82,6 @@ interval = 1
 
 ** State file location
 The package stores the current state to a file by the path =pomm-state-file-location=, which is =emacs.d/pomm= by default. Set it to wherever you like.
-* Usage
-Run =M-x pomm= to open the transient buffer.
-
-The listed commands are rather self-descriptive and match the Pomodoro ideology.
-
-The timer can have 3 states:
-- *Stopped*. Can be started with "s" or =M-x pomm-start=. A new iteration of the timer will be started.
-- *Paused*. Can be continuted with "s" / =M-x pomm-start= or stopped competely with "S" / =M-x pomm-stop=.
-- *Running*. Can be paused with "p" / =M-x pomm-pause= or stopped with "S" / =M-x pomm-stop=.
-
-The state of the timer can be reset with "R" or =M-x pomm-reset=.
-
-"U" updates the transient buffer. The update is manual because I didn't figure out how to automate this, and I think this is not /really/ necessary.
-
-Some settings are available in the transient buffer, but you can customize the relevant variables to make them permanent. Check =M-x customize-group= =pomm= for more information.
-
 * Alternatives
 There is a number of packages with a similar purpose, here are some:
 - [[https://github.com/marcinkoziej/org-pomodoro/tree/master][org-pomodoro]]
