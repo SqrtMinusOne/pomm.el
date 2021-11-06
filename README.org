@@ -9,7 +9,7 @@ This particular package features:
 - Persistent state between Emacs sessions.
   The timer state isn't reset if you close Emacs. Also, the state file can be synchronized between machines.
 - History.
-  I've implemented an option to store the timer history to a CSV file. Eventually I want to join this with [[https://activitywatch.net/][other activity data]] to see if the state of the timer actually changes how I use the computer.
+  I've implemented an option to store the timer history in a CSV file. Eventually, I want to join this with [[https://activitywatch.net/][other activity data]] to see if the state of the timer changes how I use the computer.
 
 None of the available [[*Alternatives][alternatives]] were doing quite what I wanted, and the idea of the timer is quite simple, so I figured I'd implement one myself.
 
@@ -39,7 +39,7 @@ The timer can have 3 states:
 
 The state of the timer can be reset with "R" or =M-x pomm-reset=.
 
-"U" updates the transient buffer. The update is manual because I didn't figure out how to automate this, and I think this is not /really/ necessary.
+"u" updates the transient buffer. The update is manual because I didn't figure out how to automate this, and I think this is not /really/ necessary.
 
 * Customization
 Some settings are available in the transient buffer, but you can customize the relevant variables to make them permanent. Check =M-x customize-group= =pomm= for more information.
@@ -94,7 +94,7 @@ There is a number of packages with a similar purpose, here is a rough comparison
 |------------------------+------------------------+--------------------------------+--------------------------+----------------------------------------------+---------------------------|
 | [[https://github.com/SqrtMinusOne/pomm.el][pomm.el]]                | -                      | transient.el                   | CSV                      | +                                            | alert.el                  |
 | [[https://github.com/marcinkoziej/org-pomodoro/tree/master][org-pomodoro]]           | Org Mode!              | via Org commands               | via Org mode             | -                                            | alert.el + sounds         |
-| [[https://github.com/TatriX/pomidor/][pomidor]]                | -                      | self-cooked interactive buffer | custom delimited format? | +, but on-demand                             | alert.el                  |
+| [[https://github.com/TatriX/pomidor/][pomidor]]                | -                      | self-cooked interactive buffer | custom delimited format? | +, but saving on-demand                      | alert.el + sounds         |
 | [[https://github.com/baudtack/pomodoro.el/][pomodoro.el]]            | -                      | -                              | -                        | -                                            | notifications.el + sounds |
 | [[https://github.com/konr/tomatinho/][tomatinho]]              | -                      | self-cooked interactive buffer | -                        | -                                            | message + sounds          |
 | [[https://github.com/ferfebles/redtick][redtick]]                | -                      | mode-line icon                 | +                        | -                                            | sounds                    |
