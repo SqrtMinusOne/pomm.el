@@ -109,6 +109,20 @@ The format is the same as in `format-seconds'"
   :group 'pomm
   :type 'string)
 
+(defcustom pomm-csv-history-file nil
+  "The csv history file location.
+
+The parent directory has to exists!
+
+A new entry is written whenever the timer changes status or kind
+of period.  The format is as follows:
+- timestamp
+- status
+- kind
+- iteration"
+  :group 'pomm
+  :type 'string)
+
 (defcustom pomm-on-tick-hook nil
   "A hook to run on every tick when the timer is running."
   :group 'pomm
@@ -166,13 +180,16 @@ Updated by `pomm-update-mode-line-string'.")
           (history . ,nil)
           (last-changed-time ,(time-convert nil 'integer)))
         pomm-current-mode-line-string "")
-  (setf (alist-get 'status pomm--state) 'stopped))
+  (setf (alist-get 'status pomm--state) 'stopped)
+  (run-hooks 'pomm-on-status-changed-hook))
 
 (defun pomm--init-state ()
   "Initialize the Pomodoro timer state.
 
 This function is meant to be ran only once, at the first start of the timer."
   (add-hook 'pomm-on-status-changed-hook #'pomm--save-state)
+  (add-hook 'pomm-on-status-changed-hook #'pomm--maybe-save-csv)
+  (add-hook 'pomm-on-period-changed-hook #'pomm--maybe-save-csv)
   (if (or (not (file-exists-p pomm-state-file-location))
           (not pomm-state-file-location))
       (pomm--do-reset)
@@ -203,6 +220,23 @@ This function is meant to be ran only once, at the first start of the timer."
              (lambda (item)
                (> (alist-get 'start-time item) cleanup-timestamp))
              (alist-get 'history pomm--state))))))
+
+(defun pomm--maybe-save-csv ()
+  "Write down the current state of the time to csv history.
+
+Set `pomm-csv-history-file' to customize the file location.  If the
+variable doesn't exist, function does nothing."
+  (when pomm-csv-history-file
+    (unless (file-exists-p pomm-csv-history-file)
+      (with-temp-file pomm-csv-history-file
+        (insert "timestamp,status,period,iteration\n")))
+    (write-region
+     (format "%d,%s,%s,%d\n"
+             (time-convert nil 'integer)
+             (symbol-name (alist-get 'status pomm--state))
+             (symbol-name (alist-get 'kind (alist-get 'current pomm--state)))
+             (or (alist-get 'iteration (alist-get 'current pomm--state)) 0))
+     nil pomm-csv-history-file 'append 1)))
 
 (defun pomm-reset ()
   "Reset the Pomodoro timer."
