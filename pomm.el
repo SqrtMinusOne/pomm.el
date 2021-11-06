@@ -502,7 +502,7 @@ minor mode."
                          pomm-number-of-periods)))
 
 (defclass pomm--transient-current (transient-suffix)
-  (transient :initform t)
+  ((transient :initform t))
   "A transient class to display the current state of the timer.")
 
 (cl-defmethod transient-init-value ((_ pomm--transient-current))
@@ -553,7 +553,7 @@ KIND is the same as in `pomm--state'"
           'face 'success))))))
 
 (defclass pomm--transient-history (transient-suffix)
-  (transient :initform t)
+  ((transient :initform t))
   "A transient class to display the history of the pomodoro timer.")
 
 (cl-defmethod transient-init-value ((_ pomm--transient-history))
