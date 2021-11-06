@@ -8,6 +8,8 @@ This particular package features:
 - Managing the timer with the excellent [[https://github.com/magit/transient/blob/master/lisp/transient.el][transient.el]].
 - Persistent state between Emacs sessions.
   The timer state isn't reset if you close Emacs. Also, the state file can be synchronized between machines.
+- History.
+  I've implemented an option to store the timer history to a CSV file. Eventually I want to join this with [[https://activitywatch.net/][other activity data]] to see if the state of the timer actually changes how I use the computer.
 
 None of the available [[*Alternatives][alternatives]] were doing quite what I wanted, and the idea of the timer is quite simple, so I figured I'd implement one myself.
 
@@ -75,14 +77,31 @@ interval = 1
 
 ** State file location
 The package stores the current state to a file by the path =pomm-state-file-location=, which is =emacs.d/pomm= by default. Set it to wherever you like.
+** History
+If you set the =pomm-csv-history-file= variable, the package will write CSV with the usage history there. Just keep in mind that the parent directory has to exist.
+
+The file has the following columns:
+- =timestamp=
+- =status= (=stopped=, =paused= or =running=, according to the [[*Usage][usage]] section)
+- =kind= (=work=, =short-break=, =long-break= or =nil=)
+- =iteration=
+
+A new entry is written after a particular state of the timer comes into being.
+
 * Alternatives
-There is a number of packages with a similar purpose, here are some:
-- [[https://github.com/marcinkoziej/org-pomodoro/tree/master][org-pomodoro]]
-- [[https://github.com/TatriX/pomidor/][pomidor]]
-- [[https://github.com/baudtack/pomodoro.el/][pomodoro.el]]
-- [[https://github.com/konr/tomatinho/][tomatinho]]
-- [[https://github.com/ferfebles/redtick][redtick]]
+There is a number of packages with a similar purpose, here is a rough comparison of features:
+| Package                | 3rd party integrations | Control method (1)             | Persistent history       | Persistent state                             | Notifications             |
+|------------------------+------------------------+--------------------------------+--------------------------+----------------------------------------------+---------------------------|
+| [[https://github.com/SqrtMinusOne/pomm.el][pomm.el]]                | -                      | transient.el                   | CSV                      | +                                            | alert.el                  |
+| [[https://github.com/marcinkoziej/org-pomodoro/tree/master][org-pomodoro]]           | Org Mode!              | via Org commands               | via Org mode             | -                                            | alert.el + sounds         |
+| [[https://github.com/TatriX/pomidor/][pomidor]]                | -                      | self-cooked interactive buffer | custom delimited format? | +, but on-demand                             | alert.el                  |
+| [[https://github.com/baudtack/pomodoro.el/][pomodoro.el]]            | -                      | -                              | -                        | -                                            | notifications.el + sounds |
+| [[https://github.com/konr/tomatinho/][tomatinho]]              | -                      | self-cooked interactive buffer | -                        | -                                            | message + sounds          |
+| [[https://github.com/ferfebles/redtick][redtick]]                | -                      | mode-line icon                 | +                        | -                                            | sounds                    |
+| [[https://github.com/abo-abo/gtk-pomodoro-indicator][gtk-pomodoro-indicator]] | GTK panel              | CLI                            | -                        | -, but the program is independent from Emacs | GTK notifications         |
 Be sure to check those out if this one doesn't quite fit your workflow!
+
+(1) Means of timer control with exception of Emacs interactive commands
 
 * P.S.
 The package name is not an abbreviation. I just hope it doesn't mean something horrible in some language I don't know.
