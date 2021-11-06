@@ -362,13 +362,29 @@ This sets the variable `pomm-current-mode-line-string' with a value
 from `pomm-format-mode-line'.  This is made so to minimize the load on
 the modeline, because otherwise the updates may be quite frequent.
 
-To add this to the modeline, add the following code to your config:
-\(add-to-list 'mode-line-misc-info '\(:eval pomm-current-mode-line-string\)')
-\(add-hook 'pomm-on-tick-hook 'pomm-update-mode-line-string\)
-\(add-hook 'pomm-on-tick-hook 'force-mode-line-update\)
-\(add-hook 'pomm-on-status-changed-hook 'pomm-update-mode-line-string\)
-\(add-hook 'pomm-on-status-changed-hook 'force-mode-line-update)"
+To add this to the modeline, activate the `pomm-mode-line-mode'
+minor mode."
   (setq pomm-current-mode-line-string (pomm-format-mode-line)))
+
+(define-minor-mode pomm-mode-line-mode
+  "Global minor mode for displaying the pomodoro timer status in the modeline."
+  :require 'pomm
+  :global t
+  :group 'pomm
+  :after-hook
+  (progn
+    (if pomm-mode-line-mode
+        (progn
+          (add-to-list 'mode-line-misc-info '(:eval pomm-current-mode-line-string))
+          (add-hook 'pomm-on-tick-hook #'pomm-update-mode-line-string)
+          (add-hook 'pomm-on-tick-hook #'force-mode-line-update)
+          (add-hook 'pomm-on-status-changed-hook #'pomm-update-mode-line-string)
+          (add-hook 'pomm-on-status-changed-hook #'force-mode-line-update))
+      (setq mode-line-misc-info (delete '(:eval pomm-current-mode-line-string) mode-line-misc-info))
+      (remove-hook 'pomm-on-tick-hook #'pomm-update-mode-line-string)
+      (remove-hook 'pomm-on-tick-hook #'force-mode-line-update)
+      (remove-hook 'pomm-on-status-changed-hook #'pomm-update-mode-line-string)
+      (remove-hook 'pomm-on-status-changed-hook #'force-mode-line-update))))
 
 ;;;###autoload
 (defun pomm-start ()
@@ -476,9 +492,10 @@ KIND is the same as in `pomm--state'"
     (if (or (eq 'stopped status) (not (alist-get 'current pomm--state)))
         "The timer is not running"
       (let* ((kind (alist-get 'kind (alist-get 'current pomm--state)))
+             (effective-start-time (alist-get 'effective-start-time (alist-get 'current pomm--state)))
              (start-time (alist-get 'start-time (alist-get 'current pomm--state)))
              (iteration (alist-get 'iteration (alist-get 'current pomm--state)))
-             (time-remaining (pomm--get-time-remaning)))
+             (kind-length (pomm--get-kind-length kind)))
         (concat
          (format "Iteration #%d. " iteration)
          "State: "
@@ -495,9 +512,10 @@ KIND is the same as in `pomm--state'"
          (propertize
           (format-time-string "%H:%M:%S" (seconds-to-time start-time))
           'face 'success)
-         ". Time remaining: "
+         ". Estimated end time: "
          (propertize
-          (format-seconds "%.2h:%.2m:%.2s" time-remaining)
+          (format-time-string "%H:%M:%S"
+                              (seconds-to-time (+ effective-start-time kind-length)))
           'face 'success))))))
 
 (defclass pomm--transient-history (transient-suffix)
@@ -520,8 +538,7 @@ The class doesn't actually have any value, but this is necessary for transient."
          (let ((kind (alist-get 'kind item))
                (iteration (alist-get 'iteration item))
                (start-time (alist-get 'start-time item))
-               (end-time (alist-get 'end-time item))
-               (paused-time (alist-get 'paused-time item)))
+               (end-time (alist-get 'end-time item)))
            (concat
             (if (< iteration previous-iteration)
                 (let ((is-first (= previous-iteration 1000)))

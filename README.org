@@ -49,16 +49,7 @@ The package sends alerts via =alert.el=. The default style of alert is a plain =
 #+end_src
 
 ** Modeline
-If you want the timer to display in the modeline, add the following code to your config:
-#+begin_src emacs-lisp
-(add-to-list 'mode-line-misc-info '(:eval pomm-current-mode-line-string))
-(add-hook 'pomm-on-tick-hook 'pomm-update-mode-line-string)
-(add-hook 'pomm-on-tick-hook 'force-mode-line-update)
-(add-hook 'pomm-on-status-changed-hook 'pomm-update-mode-line-string)
-(add-hook 'pomm-on-status-changed-hook 'force-mode-line-update)
-#+end_src
-
-This is quite verbose, but as I don't use this feature, I want to avoid adding an unnecessary load to my Emacs.
+If you want the timer to display in the modeline, activate the =pomm-mode-line-mode= minor mode.
 
 ** Polybar module
 If you want to display the Pomodoro status in something like polybar, you can add the following lines to your config:
