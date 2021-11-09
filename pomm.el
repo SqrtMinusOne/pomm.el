@@ -87,7 +87,7 @@
   :type 'string)
 
 (defcustom pomm-state-file-location
-  (concat user-emacs-directory "pomm")
+  (locate-user-emacs-file "pomm")
   "Location of the pomm state file."
   :group 'pomm
   :type 'string)
