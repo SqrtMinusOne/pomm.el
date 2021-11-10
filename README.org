@@ -67,7 +67,7 @@ The package sends alerts via =alert.el=. The default style of alert is a plain =
 ** Sounds
 By default sounds are disabled. Set =pomm-audio-enabled= to =t= to toggle them.
 
-This functionality needs =pomm-audio-player-executable= to be set so that the it could be invoked like: =<executable> /path/to/sound.wav=.
+This functionality needs =pomm-audio-player-executable= to be set so that the program could be invoked like: =<executable> /path/to/sound.wav=.
 
 The package ships with some built-it sounds, which you can replace by customizing the =pomm-audio-files= variable.
 ** Modeline
