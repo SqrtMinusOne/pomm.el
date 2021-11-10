@@ -123,6 +123,14 @@ of period.  The format is as follows:
   :group 'pomm
   :type 'string)
 
+(defcustom pomm-csv-history-file-timestamp-format "%s"
+  "Timestamp format in the csv file.
+
+The format is the same as in `format-time-string'.  The default
+one is the UNIX timestamp."
+  :group 'pomm
+  :type 'string)
+
 (defcustom pomm-on-tick-hook nil
   "A hook to run on every tick when the timer is running."
   :group 'pomm
@@ -231,8 +239,8 @@ variable doesn't exist, function does nothing."
       (with-temp-file pomm-csv-history-file
         (insert "timestamp,status,period,iteration\n")))
     (write-region
-     (format "%d,%s,%s,%d\n"
-             (time-convert nil 'integer)
+     (format "%s,%s,%s,%d\n"
+             (format-time-string pomm-csv-history-file-timestamp-format)
              (symbol-name (alist-get 'status pomm--state))
              (symbol-name (alist-get 'kind (alist-get 'current pomm--state)))
              (or (alist-get 'iteration (alist-get 'current pomm--state)) 0))
