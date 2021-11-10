@@ -28,6 +28,13 @@ My preferred way is =use-package= with =straight.el=:
   :commands (pomm))
 #+end_src
 
+If you want sounds before the MELPA recipe got updated to include resources, use:
+#+begin_src emacs-lisp
+(use-package pomm
+  :straight (:host github :repo "SqrtMinusOne/pomm.el" :files (:defaults "resources"))
+  :commands (pomm))
+#+end_src
+
 Or you can clone the repository, add the package to the =load-path= and load it with =require=:
 #+begin_src emacs-lisp
 (require 'pomm)
@@ -57,6 +64,12 @@ The package sends alerts via =alert.el=. The default style of alert is a plain =
 (setq alert-default-style 'libnotify)
 #+end_src
 
+** Sounds
+By default sounds are disabled. Set =pomm-audio-enabled= to =t= to toggle them.
+
+This functionality needs =pomm-audio-player-executable= to be set so that the it could be invoked like: =<executable> /path/to/sound.wav=.
+
+The package ships with some built-it sounds, which you can replace by customizing the =pomm-audio-files= variable.
 ** Modeline
 If you want the timer to display in the modeline, activate the =pomm-mode-line-mode= minor mode.
 
@@ -95,6 +108,13 @@ The file has the following columns:
 
 A new entry is written after a particular state of the timer comes into being.
 
+To customize timestamp, set the =pomm-csv-history-file-timestamp-format= variable. For example, for traditional =YYYY-MM-DD HH:mm:ss=:
+#+begin_src emacs-lisp
+(setq pomm-csv-history-file-timestamp-format "%F %T")
+#+end_src
+
+The format is the same as in =format-time-string=.
+
 * Alternatives
 There is a number of packages with a similar purpose, here is a rough comparison of features:
 | Package                | 3rd party integrations | Control method (1)             | Persistent history       | Persistent state                             | Notifications             |
@@ -112,3 +132,5 @@ Be sure to check those out if this one doesn't quite fit your workflow!
 
 * P.S.
 The package name is not an abbreviation. I just hope it doesn't mean something horrible in some language I don't know.
+
+The sounds are made by Mike Koening under [[https://creativecommons.org/licenses/by/3.0/legalcode][CC BY 3.0]].
