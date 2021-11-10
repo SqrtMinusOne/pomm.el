@@ -1,5 +1,7 @@
 #+TITLE: pomm.el
 
+[[https://melpa.org/#/pomm][file:https://melpa.org/packages/pomm-badge.svg]]
+
 Yet another implementation of a [[https://en.wikipedia.org/wiki/Pomodoro_Technique][pomodoro timer]] for Emacs.
 
 [[./img/screenshot.png]]
@@ -14,16 +16,21 @@ This particular package features:
 None of the available [[*Alternatives][alternatives]] were doing quite what I wanted, and the idea of the timer is quite simple, so I figured I'd implement one myself.
 
 * Installation
-While the package is available only in this repository, one way to install is to clone the repository, add the package to the =load-path= and load it with =require=:
-#+begin_src emacs-lisp
-(require 'pomm)
-#+end_src
+The package is available on MELPA. Install it however you usually install Emacs packages, e.g.
+#+begin_example
+M-x package-install pomm
+#+end_example
 
 My preferred way is =use-package= with =straight.el=:
 #+begin_src emacs-lisp
 (use-package pomm
-  :straight (:host github :repo "SqrtMinusOne/pomm.el")
+  :straight t
   :commands (pomm))
+#+end_src
+
+Or you can clone the repository, add the package to the =load-path= and load it with =require=:
+#+begin_src emacs-lisp
+(require 'pomm)
 #+end_src
 
 The package requires Emacs 27.1 because the time API of the previous versions is kinda crazy and 27.1 has =time-convert=.
