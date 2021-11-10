@@ -316,7 +316,7 @@ which can be played by `pomm-audio-player-executable'."
       (setq pomm-audio-enabled nil))
     (when-let (sound (alist-get kind pomm-audio-files))
       (start-process
-       "pomm audio player"
+       "pomm-audio-player"
        nil
        pomm-audio-player-executable
        sound))))
@@ -327,8 +327,8 @@ which can be played by `pomm-audio-player-executable'."
    ((eq (alist-get 'status pomm--state) 'stopped)
     (pomm--maybe-play-sound 'stop))
    ((eq (alist-get 'status pomm--state) 'running)
-    (pomm--maybe-play-sound (alist-get 'kind
-                                       (alist-get 'current pomm--state))))))
+    (pomm--maybe-play-sound
+     (alist-get 'kind (alist-get 'current pomm--state))))))
 
 (defun pomm--dispatch-notification (kind)
   "Dispatch a notification about a start of a period.
@@ -441,7 +441,8 @@ The condition is: (effective-start-time + length) < now."
        (when (pomm--need-switch-p)
          (pomm--switch-to-next))
        (run-hooks 'pomm-on-tick-hook)
-       (pomm--maybe-play-sound 'tick)))))
+       (when (eq (alist-get 'kind (alist-get 'current pomm--state)) 'work)
+         (pomm--maybe-play-sound 'tick))))))
 
 (defun pomm--get-time-remaning ()
   "Get time remaining in the current pomodoro period.
