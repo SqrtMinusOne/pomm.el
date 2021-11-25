@@ -55,6 +55,8 @@ The state of the timer can be reset with "R" or =M-x pomm-reset=.
 
 "u" updates the transient buffer. The update is manual because I didn't figure out how to automate this, and I think this is not /really/ necessary.
 
+With "r" or =M-x pomm-set-context= you can set the current "context", that is some description of the task you are currently working on. This description will show up in history and in the csv file. Also, =M-x pomm-start-with-context= will prompt for the context and then start the timer.
+
 * Customization
 Some settings are available in the transient buffer, but you can customize the relevant variables to make them permanent. Check =M-x customize-group= =pomm= for more information.
 
@@ -105,6 +107,7 @@ The file has the following columns:
 - =status= (=stopped=, =paused= or =running=, according to the [[*Usage][usage]] section)
 - =kind= (=work=, =short-break=, =long-break= or =nil=)
 - =iteration=
+- =context=
 
 A new entry is written after a particular state of the timer comes into being.
 

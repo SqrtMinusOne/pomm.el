@@ -81,6 +81,11 @@
   :group 'pomm
   :type 'boolean)
 
+(defcustom pomm-reset-context-on-iteration-end t
+  "Whether to reset the context when the iteration ends."
+  :group 'pomm
+  :type 'boolean)
+
 (defcustom pomm-work-message "Time for work!"
   "Message for a start of a work period."
   :group 'pomm
@@ -119,7 +124,8 @@ of period.  The format is as follows:
 - timestamp
 - status
 - kind
-- iteration"
+- iteration
+- context"
   :group 'pomm
   :type 'string)
 
@@ -203,6 +209,7 @@ This is an alist of with the following keys:
 - current: an alist with a current period
 - history: a list with today's history
 - last-changed-time: a timestamp of the last change in status
+- context: a string that describes the current task
 
 'current is also an alist with the following keys:
 - kind: either 'short-break, 'long-break or 'work
@@ -288,13 +295,14 @@ variable doesn't exist, function does nothing."
   (when pomm-csv-history-file
     (unless (file-exists-p pomm-csv-history-file)
       (with-temp-file pomm-csv-history-file
-        (insert "timestamp,status,period,iteration\n")))
+        (insert "timestamp,status,period,iteration,context\n")))
     (write-region
-     (format "%s,%s,%s,%d\n"
+     (format "%s,%s,%s,%d,%s\n"
              (format-time-string pomm-csv-history-file-timestamp-format)
              (symbol-name (alist-get 'status pomm--state))
              (symbol-name (alist-get 'kind (alist-get 'current pomm--state)))
-             (or (alist-get 'iteration (alist-get 'current pomm--state)) 0))
+             (or (alist-get 'iteration (alist-get 'current pomm--state)) 0)
+             (or (alist-get 'context pomm--state) ""))
      nil pomm-csv-history-file 'append 1)))
 
 (defun pomm-reset ()
@@ -383,12 +391,14 @@ The condition is: (effective-start-time + length) < now."
          (end-time (time-convert nil 'integer))
          (paused-time (- end-time
                          start-time
-                         (pomm--get-kind-length current-kind))))
+                         (pomm--get-kind-length current-kind)))
+         (context (alist-get 'context pomm--state)))
     (push `((kind . ,current-kind)
             (iteration . ,current-iteration)
             (start-time . ,start-time)
             (end-time . ,end-time)
-            (paused-time . ,paused-time))
+            (paused-time . ,paused-time)
+            (context . ,context))
           (alist-get 'history pomm--state))))
 
 (defun pomm--switch-to-next ()
@@ -427,7 +437,9 @@ The condition is: (effective-start-time + length) < now."
       (setf (alist-get 'current pomm--state) nil)
       (setf (alist-get 'status pomm--state) 'stopped))
     (pomm--save-state)
-    (run-hooks 'pomm-on-status-changed-hook)))
+    (run-hooks 'pomm-on-status-changed-hook)
+    (when (and (eq next-kind 'long-break) pomm-reset-context-on-iteration-end)
+      (setf (alist-get 'context pomm--state) nil))))
 
 (defun pomm--on-tick ()
   "A function to be ran on a timer tick."
@@ -531,6 +543,18 @@ minor mode."
   (unless pomm--timer
     (setq pomm--timer (run-with-timer 0 1 'pomm--on-tick))))
 
+(defun pomm-set-context ()
+  "Set the current context for the pomodoro timer."
+  (interactive)
+  (setf (alist-get 'context pomm--state)
+        (prin1-to-string (read-minibuffer "Context: " (current-word)))))
+
+(defun pomm-start-with-context ()
+  "Prompt for context and call `pomm-start'."
+  (interactive)
+  (pomm-set-context)
+  (pomm-start))
+
 (defun pomm-stop ()
   "Stop the current iteration of the pomodoro timer."
   (interactive)
@@ -540,7 +564,9 @@ minor mode."
     (setf (alist-get 'status pomm--state) 'stopped
           (alist-get 'current pomm--state) nil
           (alist-get 'last-changed-time pomm--state) (time-convert nil 'integer))
-    (run-hooks 'pomm-on-status-changed-hook)))
+    (run-hooks 'pomm-on-status-changed-hook)
+    (when pomm-reset-context-on-iteration-end
+      (setf (alist-get 'context pomm--state) nil))))
 
 (defun pomm-pause ()
   "Pause the pomodoro timer."
@@ -588,6 +614,49 @@ minor mode."
   :reader (lambda (&rest _)
             (read-number "Number of work periods before a long break:"
                          pomm-number-of-periods)))
+
+(defclass pomm--set-context-on-iteration-end-infix (transient-switch)
+  ((transient :initform t))
+  "A transient class to toggle `pomm-reset-context-on-iteration-end'.")
+
+(cl-defmethod transient-init-value ((obj pomm--set-context-on-iteration-end-infix))
+  (oset obj value
+        pomm-reset-context-on-iteration-end))
+
+(cl-defmethod transient-infix-read ((_ transient-switch))
+  "Toggle the switch on or off."
+  (setq pomm-reset-context-on-iteration-end
+        (not pomm-reset-context-on-iteration-end)))
+
+(transient-define-infix pomm--set-reset-context-on-iteration-end ()
+  :class 'pomm--set-context-on-iteration-end-infix
+  :argument "--context-reset"
+  :key "-r"
+  :description "Reset the context on the interation end")
+
+(defclass pomm--set-context-infix (transient-variable)
+  ((transient :initform 'transient--do-call)
+   (always-read :initform t)))
+
+(cl-defmethod transient-init-value ((_ pomm--set-context-infix))
+  (alist-get 'context pomm--state))
+
+(cl-defmethod transient-infix-set ((_ pomm--set-context-infix) value)
+  (setf (alist-get 'context pomm--state) value))
+
+(cl-defmethod transient-prompt ((_ pomm--set-context-infix))
+  "Set context: ")
+
+(cl-defmethod transient-format-value ((_ pomm--set-context-infix))
+  (propertize (if-let (val (alist-get 'context pomm--state))
+                  (prin1-to-string val)
+                "unset")
+              'face 'transient-value))
+
+(transient-define-infix pomm--set-context ()
+  :class 'pomm--set-context-infix
+  :key "-c"
+  :description "Context:")
 
 (defclass pomm--transient-current (transient-suffix)
   ((transient :initform t))
@@ -660,7 +729,8 @@ The class doesn't actually have any value, but this is necessary for transient."
          (let ((kind (alist-get 'kind item))
                (iteration (alist-get 'iteration item))
                (start-time (alist-get 'start-time item))
-               (end-time (alist-get 'end-time item)))
+               (end-time (alist-get 'end-time item))
+               (context (alist-get 'context item)))
            (concat
             (if (< iteration previous-iteration)
                 (let ((is-first (= previous-iteration 1000)))
@@ -675,7 +745,10 @@ The class doesn't actually have any value, but this is necessary for transient."
              'face (pomm--get-kind-face kind))
             (format-time-string "%H:%M" (seconds-to-time start-time))
             "-"
-            (format-time-string "%H:%M" (seconds-to-time end-time)))))
+            (format-time-string "%H:%M" (seconds-to-time end-time))
+            (if context
+                (format " : %s" (propertize context 'face 'transient-value))
+              ""))))
        (alist-get 'history pomm--state)
        "\n"))))
 
@@ -696,11 +769,14 @@ The class doesn't actually have any value, but this is necessary for transient."
   (interactive))
 
 (transient-define-prefix pomm-transient ()
-  ["Settings"
+  ["Timer settings"
    (pomm--set-short-break-period)
    (pomm--set-long-break-period)
    (pomm--set-work-period)
    (pomm--set-number-of-periods)]
+  ["Context settings"
+   (pomm--set-context)
+   (pomm--set-reset-context-on-iteration-end)]
   ["Commands"
    :class transient-row
    ("s" "Start the timer" pomm-start :transient t)
