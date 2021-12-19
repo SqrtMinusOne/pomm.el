@@ -4,8 +4,8 @@
 
 ;; Author: Korytov Pavel <thexcloud@gmail.com>
 ;; Maintainer: Korytov Pavel <thexcloud@gmail.com>
-;; Version: 0.1.3
-;; Package-Requires: ((emacs "27.1") (alert "1.2") (seq "2.22") (transient "0.2.0"))
+;; Version: 0.1.4
+;; Package-Requires: ((emacs "27.1") (alert "1.2") (seq "2.22") (transient "0.3.0"))
 ;; Homepage: https://github.com/SqrtMinusOne/pomm.el
 
 ;; This file is NOT part of GNU Emacs.
@@ -623,7 +623,7 @@ minor mode."
   (oset obj value
         pomm-reset-context-on-iteration-end))
 
-(cl-defmethod transient-infix-read ((_ transient-switch))
+(cl-defmethod transient-infix-read ((_ pomm--set-context-on-iteration-end-infix))
   "Toggle the switch on or off."
   (setq pomm-reset-context-on-iteration-end
         (not pomm-reset-context-on-iteration-end)))
