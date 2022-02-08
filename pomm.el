@@ -81,6 +81,11 @@
   :group 'pomm
   :type 'boolean)
 
+(defcustom pomm-ask-before-work nil
+  "Ask a user whether to start a new pomodoro period."
+  :group 'pomm
+  :type 'boolean)
+
 (defcustom pomm-reset-context-on-iteration-end t
   "Whether to reset the context when the iteration ends."
   :group 'pomm
@@ -424,18 +429,23 @@ The condition is: (effective-start-time + length) < now."
                              (+ current-iteration 1)
                            current-iteration)))
     (pomm--store-current-to-history)
-    (if (or (not (eq next-kind 'long-break))
-            (not pomm-ask-before-long-break)
-            (y-or-n-p "Start a long break (y) or end the pomodors (n)? "))
+    (if (or
+         (and (eq next-kind 'long-break)
+              pomm-ask-before-long-break
+              (not (y-or-n-p "Start a long break (y) or end the pomodoros (n)? ")))
+         (and (eq next-kind 'work)
+              pomm-ask-before-work
+              (not (y-or-n-p "Start a pomodoro (y) or end the pomodoros (n)? "))))
         (progn
-          (setf (alist-get 'current pomm--state)
-                `((kind . ,next-kind)
-                  (start-time . ,(time-convert nil 'integer))
-                  (effective-start-time . ,(time-convert nil 'integer))
-                  (iteration . ,next-iteration)))
-          (pomm--dispatch-notification next-kind))
-      (setf (alist-get 'current pomm--state) nil)
-      (setf (alist-get 'status pomm--state) 'stopped))
+          (setf (alist-get 'current pomm--state) nil)
+          (setf (alist-get 'status pomm--state) 'stopped))
+      (progn
+        (setf (alist-get 'current pomm--state)
+              `((kind . ,next-kind)
+                (start-time . ,(time-convert nil 'integer))
+                (effective-start-time . ,(time-convert nil 'integer))
+                (iteration . ,next-iteration)))
+        (pomm--dispatch-notification next-kind)))
     (pomm--save-state)
     (run-hooks 'pomm-on-status-changed-hook)
     (when (and (eq next-kind 'long-break) pomm-reset-context-on-iteration-end)
