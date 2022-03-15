@@ -161,6 +161,11 @@ a particular event."
   :group 'pomm
   :type 'boolean)
 
+(defcustom pomm-audio-tick-enabled nil
+  "Whether to play ticking sound."
+  :group 'pomm
+  :type 'boolean)
+
 (defun pomm--get-sound-file-path (name)
   "Get path to the sound resource NAME.
 
@@ -327,7 +332,8 @@ which can be played by `pomm-audio-player-executable'."
     (unless pomm-audio-player-executable
       (error "No audio player executable! Set 'pomm-audio-player-executable'")
       (setq pomm-audio-enabled nil))
-    (when-let (sound (alist-get kind pomm-audio-files))
+    (when-let ((play-sound (or (not (eq 'tick kind)) pomm-audio-tick-enabled))
+               (sound (alist-get kind pomm-audio-files)))
       (start-process
        "pomm-audio-player"
        nil
