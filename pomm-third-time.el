@@ -223,7 +223,7 @@ return it, otherwise, return a value like a calc error."
   (let ((parsed (pomm-third-time--calc-eval
                  pomm-third-time-fraction)))
     (if (listp parsed)
-        (user-error "Error in `pomm-third-time-fraction': %s" (card parsed))
+        (user-error "Error in `pomm-third-time-fraction': %s" (nth 1 parsed))
       parsed)))
 
 (defun pomm-third-time--current-period-time ()
@@ -280,10 +280,10 @@ return it, otherwise, return a value like a calc error."
 KIND is the same as in `pomm-third-time--state'"
   (alert
    (pcase kind
-     ('break (concat pomm-third-time-break-message)
-             (format "\nTime available: %s"
-                     (pomm-third-time--format-period
-                      (pomm-third-time--break-time))))
+     ('break (concat pomm-third-time-break-message
+                     (format "\nTime available: %s"
+                             (pomm-third-time--format-period
+                              (pomm-third-time--break-time)))))
      ('work (concat pomm-work-message
                     (when (> (pomm-third-time--break-time) 0)
                       (format "\nBreak time remaining: %s"
@@ -351,7 +351,7 @@ Take a look at the `pomm-third-time' function for more details."
               (run-hooks 'pomm-third-time-on-status-changed-hook))
     ('running (message "The timer is running!")))
   (unless pomm-third-time--timer
-    (setq pomm--third-time--timer (run-with-timer 0 1 'pomm-third-time--on-tick))))
+    (setq pomm-third-time--timer (run-with-timer 0 1 'pomm-third-time--on-tick))))
 
 (defun pomm-third-time-stop ()
   "Stop the Third Time timer."
@@ -380,8 +380,7 @@ Take a look at the `pomm-third-time' function for more details."
     (if (or (eq current-status 'stopped)
             (not (alist-get 'current pomm-third-time--state)))
         ""
-      (let ((current-kind (alist-get 'kind (alist-get 'current pomm-third-time--state)))
-            (break-time (pomm-third-time--break-time)))
+      (let ((current-kind (alist-get 'kind (alist-get 'current pomm-third-time--state))))
         (format "[%s] %s (%s) "
                 current-kind
                 (pomm-third-time--format-period
@@ -424,7 +423,7 @@ Take a look at the `pomm-third-time' function for more details."
   "Do `completing-read' with `calc-eval'."
   (let ((res (completing-read
               "Time: "
-              (lambda (string fun flag)
+              (lambda (string _ flag)
                 (when (eq flag 'metadata)
                   (let ((res (pomm-third-time--calc-eval string)))
                     (if (listp res)
@@ -460,15 +459,19 @@ Take a look at the `pomm-third-time' function for more details."
    (always-read :initform t)))
 
 (cl-defmethod transient-init-value ((_ pomm-third-time--set-context-infix))
+  "Initialize the value of context infix from `pomm-third-time-state'."
   (alist-get 'context pomm-third-time--state))
 
 (cl-defmethod transient-infix-set ((_ pomm-third-time--set-context-infix) value)
+  "Update `pomm-third-time-start' with VALUE from the context infix."
   (setf (alist-get 'context pomm-third-time--state) value))
 
 (cl-defmethod transient-prompt ((_ pomm-third-time--set-context-infix))
+  "Return the prompt text for the context infix."
   "Set context: ")
 
 (cl-defmethod transient-format-value ((_ pomm-third-time--set-context-infix))
+  "Format value for the context infix."
   (propertize (if-let (val (alist-get 'context pomm-third-time--state))
                   (prin1-to-string val)
                 "unset")
@@ -540,7 +543,7 @@ The class doesn't actually have any value, but this is necessary for transient."
   nil)
 
 (cl-defmethod transient-format ((_ pomm-third-time--transient-history))
-  "Format the history list for the transient buffer"
+  "Format the history list for the transient buffer."
   (if (not (alist-get 'history pomm-third-time--state))
       "No history yet"
     (let ((previous-iteration 1000))

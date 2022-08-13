@@ -1,4 +1,4 @@
-;;; pomm.el --- Pomodoro and Third Time timers. -*- lexical-binding: t -*-
+;;; pomm.el --- Pomodoro and Third Time timers -*- lexical-binding: t -*-
 
 ;; Copyright (C) 2022 Korytov Pavel
 
@@ -634,10 +634,14 @@ minor mode."
    (variable :initarg :variable)))
 
 (cl-defmethod transient-init-value ((obj pomm--transient-lisp-variable-switch))
+  "Initialize the value for the `pomm--transient-lisp-variable-switch'."
   (oset obj value
         (symbol-value (oref obj variable))))
 
 (cl-defmethod transient-infix-read ((obj pomm--transient-lisp-variable-switch))
+  "Toggle the value of the `pomm--transient-lisp-variable-switch'.
+
+This changes both the value of the variable and the value of the class."
   (oset obj value
         (set (oref obj variable)
              (not (symbol-value (oref obj variable))))))
@@ -654,15 +658,19 @@ minor mode."
    (always-read :initform t)))
 
 (cl-defmethod transient-init-value ((_ pomm--set-context-infix))
+  "Initialize the value of the context infix from `pomm-state'."
   (alist-get 'context pomm--state))
 
 (cl-defmethod transient-infix-set ((_ pomm--set-context-infix) value)
+  "Update `pomm-state' with VALUE from the context infix."
   (setf (alist-get 'context pomm--state) value))
 
 (cl-defmethod transient-prompt ((_ pomm--set-context-infix))
+  "Return the prompt text for the context infix."
   "Set context: ")
 
 (cl-defmethod transient-format-value ((_ pomm--set-context-infix))
+  "Format value for the context infix."
   (propertize (if-let (val (alist-get 'context pomm--state))
                   (prin1-to-string val)
                 "unset")
