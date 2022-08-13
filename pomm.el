@@ -627,21 +627,22 @@ minor mode."
             (read-number "Number of work periods before a long break:"
                          pomm-number-of-periods)))
 
-(defclass pomm--set-context-on-iteration-end-infix (transient-switch)
-  ((transient :initform t))
-  "A transient class to toggle `pomm-reset-context-on-iteration-end'.")
+(defclass pomm--transient-lisp-variable-switch (transient-switch)
+  ((transient :initform t)
+   (variable :initarg :variable)))
 
-(cl-defmethod transient-init-value ((obj pomm--set-context-on-iteration-end-infix))
+(cl-defmethod transient-init-value ((obj pomm--transient-lisp-variable-switch))
   (oset obj value
-        pomm-reset-context-on-iteration-end))
+        (symbol-value (oref obj variable))))
 
-(cl-defmethod transient-infix-read ((_ pomm--set-context-on-iteration-end-infix))
-  "Toggle the switch on or off."
-  (setq pomm-reset-context-on-iteration-end
-        (not pomm-reset-context-on-iteration-end)))
+(cl-defmethod transient-infix-read ((obj pomm--transient-lisp-variable-switch))
+  (oset obj value
+        (set (oref obj variable)
+             (not (symbol-value (oref obj variable))))))
 
 (transient-define-infix pomm--set-reset-context-on-iteration-end ()
-  :class 'pomm--set-context-on-iteration-end-infix
+  :class 'pomm--transient-lisp-variable-switch
+  :variable 'pomm-reset-context-on-iteration-end
   :argument "--context-reset"
   :key "-r"
   :description "Reset the context on the interation end")
