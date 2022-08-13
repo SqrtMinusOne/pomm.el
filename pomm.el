@@ -183,6 +183,7 @@ root."
   `((work . ,(pomm--get-sound-file-path "resources/bell.wav"))
     (tick . ,(pomm--get-sound-file-path "resources/tick.wav"))
     (short-break . ,(pomm--get-sound-file-path "resources/bell.wav"))
+    (break . ,(pomm--get-sound-file-path "resources/bell.wav"))
     (long-break . ,(pomm--get-sound-file-path "resources/bell.wav"))
     (stop . ,(pomm--get-sound-file-path "resources/air_horn.wav")))
   "Paths to the sounds to play on various events.
@@ -191,7 +192,7 @@ Each element of the list is a cons cell, where:
 - key is an event type
 - value is either a path to the sound file or nil."
   :group 'pomm
-  :options '(work tick short-break long-break stop)
+  :options '(work tick break short-break long-break stop)
   :type '(alist :key-type (symbol :tag "Event")
                 :value-type (choice (string :tag "Path")
                                     (const nil :tag "No sound"))))
@@ -206,18 +207,13 @@ Each element of the list is a cons cell, where:
   :group 'pomm
   :type 'hook)
 
-(defcustom pomm-on-period-changed-hook nil
-  "A hook to run on a period status change."
-  :group 'pomm
-  :type 'hook)
-
 (defvar pomm--state nil
   "The current state of pomm.el.
 
-This is an alist of with the following keys:
+This is an alist with the following keys:
 - status: either 'stopped, 'paused or 'running
 - current: an alist with a current period
-- history: a list with today's history
+- history: a list with history for today
 - last-changed-time: a timestamp of the last change in status
 - context: a string that describes the current task
 
@@ -225,7 +221,7 @@ This is an alist of with the following keys:
 - kind: either 'short-break, 'long-break or 'work
 - start-time: start timestamp
 - effective-start-time: start timestamp, corrected for pauses
-- iteration: number the current Pomodoro iteration
+- iteration: number of the current Pomodoro iteration
 
 History is a list of alists with the following keys:
 - kind: same as in current
@@ -260,11 +256,10 @@ Updated by `pomm-update-mode-line-string'.")
 (defun pomm--init-state ()
   "Initialize the Pomodoro timer state.
 
-This function is meant to be ran only once, at the first start of the timer."
+This function is meant to be executed only once, at the first
+start of the timer."
   (add-hook 'pomm-on-status-changed-hook #'pomm--save-state)
   (add-hook 'pomm-on-status-changed-hook #'pomm--maybe-save-csv)
-  (add-hook 'pomm-on-period-changed-hook #'pomm--maybe-save-csv)
-  (add-hook 'pomm-on-period-changed-hook #'pomm--dispatch-current-sound)
   (add-hook 'pomm-on-status-changed-hook #'pomm--dispatch-current-sound)
   (if (or (not (file-exists-p pomm-state-file-location))
           (not pomm-state-file-location))
@@ -355,7 +350,7 @@ which can be played by `pomm-audio-player-executable'."
 KIND is the same as in `pomm--state'"
   (alert
    (pcase kind
-     ('short-break pomm-short-break-message)
+     ((or 'break 'short-break) pomm-short-break-message)
      ('long-break pomm-long-break-message)
      ('work pomm-work-message))
    :title "Pomodoro"))
@@ -458,7 +453,7 @@ The condition is: (effective-start-time + length) < now."
       (setf (alist-get 'context pomm--state) nil))))
 
 (defun pomm--on-tick ()
-  "A function to be ran on a timer tick."
+  "A function to execute on each timer tick."
   (pcase (alist-get 'status pomm--state)
     ('stopped (when pomm--timer
                 (cancel-timer pomm--timer)
@@ -565,6 +560,7 @@ minor mode."
   (setf (alist-get 'context pomm--state)
         (prin1-to-string (read-minibuffer "Context: " (current-word)))))
 
+;;;###autoload
 (defun pomm-start-with-context ()
   "Prompt for context and call `pomm-start'."
   (interactive)
