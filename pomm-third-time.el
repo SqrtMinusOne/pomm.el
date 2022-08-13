@@ -34,7 +34,7 @@
 (require 'calc)
 
 (defgroup pomm-third-time nil
-  "Third time timer implementation"
+  "Third time timer implementation."
   :group 'pomm)
 
 (defcustom pomm-third-time-fraction "1/3"
@@ -108,11 +108,14 @@ This is an alist with the following keys:
   (run-hooks 'pomm-on-status-changed-hook))
 
 (defun pomm-third-time--init-state ()
-  "Initialize the Third Time timer state"
+  "Initialize the Third Time timer state."
   (add-hook 'pomm-third-time-on-status-changed-hook #'pomm-third-time--save-state)
   ;; TODO (add-hook 'pomm-on-status-changed-hook #'pomm-third-time--maybe-save-csv)
   (add-hook 'pomm-third-time-on-status-changed-hook
             #'pomm-third-time--dispatch-current-sound)
+  (add-hook 'pomm-mode-line-mode-hook
+            #'pomm-third-time--setup-mode-line)
+  (pomm-third-time--setup-mode-line)
   (if (or (not (file-exists-p pomm-third-time-state-file-location))
           (not pomm-third-time-state-file-location))
       (pomm-third-time--do-reset)
@@ -160,7 +163,7 @@ This is an alist with the following keys:
      (alist-get 'kind (alist-get 'current pomm-third-time--state))))))
 
 (defun pomm-third-time--fraction ()
-  "Get fraction of break time to work time"
+  "Get fraction of break time to work time."
   (if (stringp pomm-third-time-fraction)
       (string-to-number (calc-eval pomm-third-time-fraction))
     pomm-third-time-fraction))
@@ -192,7 +195,7 @@ This is an alist with the following keys:
    (<= (pomm-third-time--break-time) 0)))
 
 (defun pomm-third-time--store-current-to-history ()
-  "Store the timer state to history"
+  "Store the timer state to history."
   (let ((current-kind (alist-get 'kind (alist-get 'current pomm-third-time--state)))
         (current-start-time (alist-get 'start-time
                                        (alist-get 'current pomm-third-time--state)))
@@ -204,9 +207,11 @@ This is an alist with the following keys:
               (end-time . ,(time-convert nil 'integer)))
             (alist-get 'history pomm-third-time--state)))))
 
-(defun pomm-third-time--format-period (period)
-  "TODO"
-  (prin1-to-string period))
+(defun pomm-third-time--format-period (seconds)
+  "Format SECONDS into string."
+  (if (>= seconds (* 60 60))
+      (format-seconds "%.2h:%.2m:%.2s" seconds)
+    (format-seconds "%.2m:%.2s" seconds)))
 
 (defun pomm-third-time--dispatch-notification (kind)
   "Dispatch a notification about a start of a period.
@@ -219,14 +224,14 @@ KIND is the same as in `pomm--state'"
                      (pomm-third-time--format-period
                       (pomm-third-time--break-time))))
      ('work (concat pomm-work-message
-                    (if (> (pomm-third-time--break-time) 0)
-                        (format "\nBreak time remaining: %s"
-                                (pomm-third-time--format-period
-                                 (pomm-third-time--break-time)))))))
+                    (when (> (pomm-third-time--break-time) 0)
+                      (format "\nBreak time remaining: %s"
+                              (pomm-third-time--format-period
+                               (pomm-third-time--break-time)))))))
    :title "Pomodoro"))
 
 (defun pomm-third-time--switch ()
-  "Switch between periods"
+  "Switch between periods."
   (let* ((current-kind (alist-get 'kind (alist-get 'current pomm-third-time--state)))
          (break-time (pomm-third-time--break-time))
          (iteration (alist-get 'iteration
@@ -274,7 +279,9 @@ KIND is the same as in `pomm--state'"
 
 ;;;###autoload
 (defun pomm-third-time-start ()
-  "TODO"
+  "Start the Third Time timer.
+
+Take a look at the `pomm-third-time' function for more details."
   (interactive)
   (unless pomm-third-time--state
     (pomm-third-time--init-state))
@@ -286,22 +293,57 @@ KIND is the same as in `pomm--state'"
     (setq pomm--third-time--timer (run-with-timer 0 1 'pomm-third-time--on-tick))))
 
 (defun pomm-third-time-stop ()
+  "Stop the Third Time timer."
   (interactive)
   (pcase (alist-get 'status pomm-third-time--state)
     ('stopped (message "The timer is already stopped!"))
     ('running
-     (pomm-third-time--store-current-to-history)
-     (setf (alist-get 'status pomm-third-time--state) 'stopped
-           (alist-get 'current pomm-third-time--state) nil
-           (alist-get 'last-changed-time pomm-third-time--state)
-           (time-convert nil 'integer))
-     (run-hooks 'pomm-third-time-on-status-changed-hook)
-     (when pomm-reset-context-on-iteration-end
-       (setf (alist-get 'context pomm-third-time--state) nil)))))
+     (when (y-or-n-p "This will reset the accumulated break time.  Continue? ")
+       (pomm-third-time--store-current-to-history)
+       (setf (alist-get 'status pomm-third-time--state) 'stopped
+             (alist-get 'current pomm-third-time--state) nil
+             (alist-get 'last-changed-time pomm-third-time--state)
+             (time-convert nil 'integer))
+       (run-hooks 'pomm-third-time-on-status-changed-hook)
+       (when pomm-reset-context-on-iteration-end
+         (setf (alist-get 'context pomm-third-time--state) nil))))))
 
 (defun pomm-third-time-switch ()
+  "Switch between work and break in the Third Time timer."
   (interactive)
   (pomm-third-time--switch))
+
+(defun pomm-third-time-format-mode-line ()
+  "Format mode string for the Third Time timer."
+  (let ((current-status (alist-get 'status pomm-third-time--state)))
+    (if (or (eq current-status 'stopped)
+            (not (alist-get 'current pomm-third-time--state)))
+        ""
+      (let ((current-kind (alist-get 'kind (alist-get 'current pomm-third-time--state)))
+            (break-time (pomm-third-time--break-time)))
+        (format "[%s] %s (%s) "
+                current-kind
+                (pomm-third-time--format-period
+                 (pomm-third-time--current-period-time))
+                (pomm-third-time--format-period
+                 (pomm-third-time--break-time)))))))
+
+(defun pomm-third-time-update-mode-string ()
+  "Update modeline for the Third Time timer."
+  (setq pomm-current-mode-line-string (pomm-third-time-format-mode-line)))
+
+(defun pomm-third-time--setup-mode-line ()
+  "Setup `pomm-mode-line-mode' to work with `pomm-third-time'."
+  (if pomm-mode-line-mode
+      (progn
+        (add-hook 'pomm-third-time-on-tick-hook #'pomm-third-time-update-mode-string)
+        (add-hook 'pomm-third-time-on-tick-hook #'force-mode-line-update)
+        (add-hook 'pomm-third-time-on-status-changed-hook #'pomm-third-time-update-mode-string)
+        (add-hook 'pomm-third-time-on-status-changed-hook #'force-mode-line-update))
+    (remove-hook 'pomm-third-time-on-tick-hook #'pomm-third-time-update-mode-string)
+    (remove-hook 'pomm-third-time-on-tick-hook #'force-mode-line-update)
+    (remove-hook 'pomm-third-time-on-status-changed-hook #'pomm-third-time-update-mode-string)
+    (remove-hook 'pomm-third-time-on-status-changed-hook #'force-mode-line-update)))
 
 (provide 'pomm-third-time)
 ;;; pomm-third-time.el ends here
