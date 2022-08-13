@@ -1,10 +1,10 @@
-;;; pomm.el --- Yet another Pomodoro timer implementation -*- lexical-binding: t -*-
+;;; pomm.el --- Pomodoro and Third Time timers. -*- lexical-binding: t -*-
 
-;; Copyright (C) 2021 Korytov Pavel
+;; Copyright (C) 2022 Korytov Pavel
 
 ;; Author: Korytov Pavel <thexcloud@gmail.com>
 ;; Maintainer: Korytov Pavel <thexcloud@gmail.com>
-;; Version: 0.1.4
+;; Version: 0.2.0
 ;; Package-Requires: ((emacs "27.1") (alert "1.2") (seq "2.22") (transient "0.3.0"))
 ;; Homepage: https://github.com/SqrtMinusOne/pomm.el
 
@@ -25,14 +25,16 @@
 
 ;;; Commentary:
 
-;; An implementation of a Pomodoro timer for Emacs.  Distintive features
-;; of this particular implementation:
-;; - Managing the timer with transient.el (`pomm' command)
+;; Implementation of two time management methods in Emacs: Pomodoro
+;; and Third Time.
+;; This implementation features:
+;; - Managing the timer with transient.el
 ;; - Persistent state between Emacs sessions.
 ;;   So one could close & reopen Emacs without interruption the timer.
 ;;
-;; Take a look at `pomm-update-mode-line-string' on how to setup this
-;; package with a modeline.
+;; Main entrypoints are: `pomm' for Pomodoro and `pomm-third-time' for
+;; Third Time.
+;;
 ;; Also take a look at README at
 ;; <https://github.com/SqrtMinusOne/pomm.el> for more information.
 
@@ -43,7 +45,7 @@
 (require 'transient)
 
 (defgroup pomm nil
-  "Yet another Pomodoro timer implementation."
+  "Pomodoro and Third Time timers."
   :group 'tools)
 
 (defcustom pomm-work-period 25
@@ -77,12 +79,12 @@
   :type 'string)
 
 (defcustom pomm-ask-before-long-break t
-  "Ask a user whether to do a long break or stop the pomodoros."
+  "Ask the user whether to do a long break or stop the pomodoros."
   :group 'pomm
   :type 'boolean)
 
 (defcustom pomm-ask-before-work nil
-  "Ask a user whether to start a new pomodoro period."
+  "Ask the user whether to start a new pomodoro period."
   :group 'pomm
   :type 'boolean)
 
@@ -120,9 +122,9 @@ The format is the same as in `format-seconds'"
   :type 'string)
 
 (defcustom pomm-csv-history-file nil
-  "The csv history file location.
+  "If non-nil, save timer history in a CSV format.
 
-The parent directory has to exists!
+The parent directory has to exist!
 
 A new entry is written whenever the timer changes status or kind
 of period.  The format is as follows:
@@ -173,9 +175,8 @@ When loading the package, `load-file-name' should point to the
 location of this file, which means that resources folder should
 be in the same directory.
 
-If the file is evaluated interactively (for development
-purposes), the `default-directory' is most likely the project
-root."
+If the file is evaluated interactively (for development purposes), the
+`default-directory' variable is most likely the project root."
   (or (and load-file-name (concat (file-name-directory load-file-name) name))
       (concat default-directory name)))
 
@@ -208,7 +209,7 @@ Each element of the list is a cons cell, where:
   :type 'hook)
 
 (defvar pomm--state nil
-  "The current state of pomm.el.
+  "The current state of the Pomodoro timer.
 
 This is an alist with the following keys:
 - status: either 'stopped, 'paused or 'running
@@ -228,7 +229,8 @@ History is a list of alists with the following keys:
 - iteration
 - start-time: start timestamp
 - end-time: end timestamp
-- paused-time: time spent in a paused state")
+- paused-time: time spent in a paused state
+- context: current context.")
 
 (defvar pomm--timer nil
   "A variable for the pomm timer.")
@@ -818,7 +820,15 @@ The timer can have 3 states:
   'S' / `pomm-stop'.
 - Running.
   Can be paused with 'p' / `pomm-pause' or stopped with 'S' /
-  `pomm-stop'."
+  `pomm-stop'.
+
+The timer supports setting \"context\", for example, a task on which
+you're working on.  It can be set with '-c' or `pomm-set-context'.
+This is useful together with CSV logging, which is enabled if
+`pomm-csv-history-file' is non-nil.
+
+Enable `pomm-mode-line-mode' to display the timer state in the
+modeline."
   (interactive)
   (unless pomm--state
     (pomm--init-state))

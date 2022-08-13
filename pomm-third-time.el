@@ -36,7 +36,7 @@
 (require 'calc)
 
 (defgroup pomm-third-time nil
-  "Third time timer implementation."
+  "Third Time timer implementation."
   :group 'pomm)
 
 (defcustom pomm-third-time-fraction "1/3"
@@ -60,7 +60,7 @@ Can be string or number, a string is interpreted with
 
 (defcustom pomm-third-time-state-file-location
   (locate-user-emacs-file "pomm-third-time")
-  "Location of the pomm-third-time state file."
+  "Location of the `pomm-third-time' state file."
   :group 'pomm-third-time
   :type 'string)
 
@@ -69,8 +69,25 @@ Can be string or number, a string is interpreted with
   :group 'pomm
   :type 'string)
 
+(defcustom pomm-third-time-csv-history-file nil
+  "If non-nil, save timer history in a CSV format.
+
+The parent directory has to exist!
+
+A new entry is written whenever the timer changes status or kind
+of period.  The format is as follows:
+- timestamp
+- status
+- kind
+- iteration
+- break-time-remaining
+- context"
+  :group 'pomm-third-time
+  :type '(choice (string :tag "Path")
+                 (const nil :tag "Do not save")))
+
 (defvar pomm-third-time--state nil
-  "The current state of pomm-third-time.el.
+  "The current state of the Third Time timer.
 
 This is an alist with the following keys:
 - status: either 'stopped or 'running
@@ -113,7 +130,7 @@ This is an alist with the following keys:
 (defun pomm-third-time--init-state ()
   "Initialize the Third Time timer state."
   (add-hook 'pomm-third-time-on-status-changed-hook #'pomm-third-time--save-state)
-  ;; TODO (add-hook 'pomm-on-status-changed-hook #'pomm-third-time--maybe-save-csv)
+  (add-hook 'pomm-on-status-changed-hook #'pomm-third-time--maybe-save-csv)
   (add-hook 'pomm-third-time-on-status-changed-hook
             #'pomm-third-time--dispatch-current-sound)
   (add-hook 'pomm-mode-line-mode-hook
@@ -131,13 +148,13 @@ This is an alist with the following keys:
   (pomm-third-time--cleanup-old-history))
 
 (defun pomm-third-time--save-state ()
-  "Save the current Pomodoro timer state."
+  "Save the current Third Time timer state."
   (when pomm-third-time-state-file-location
     (with-temp-file pomm-third-time-state-file-location
       (insert (prin1-to-string pomm-third-time--state)))))
 
 (defun pomm-third-time--cleanup-old-history ()
-  "Clear history of previous days from the Pomodoro timer."
+  "Clear history of previous days from the Third Time timer."
   (let ((cleanup-time (decode-time)))
     (setf (decoded-time-second cleanup-time) 0
           (decoded-time-minute cleanup-time) 0
@@ -149,6 +166,25 @@ This is an alist with the following keys:
              (lambda (item)
                (> (alist-get 'start-time item) cleanup-timestamp))
              (alist-get 'history pomm-third-time--state))))))
+
+(defun pomm-third-time--maybe-save-csv ()
+  "Log the current state of the timer to a CSV history file.
+
+Set `pomm-third-time-csv-history-file' to customize the file location.
+If the variable is nil, the function does nothing."
+  (when pomm-third-time-csv-history-file
+    (unless (file-exists-p pomm-third-time-csv-history-file)
+      (with-temp-file pomm-third-time-csv-history-file
+        (insert "timestamp,status,period,iteration,break-time-remaining,context\n")))
+    (write-region
+     (format "%s,%s,%s,%d,%d,%s\n"
+             (format-time-string pomm-csv-history-file-timestamp-format)
+             (symbol-name (alist-get 'status pomm--state))
+             (symbol-name (alist-get 'kind (alist-get 'current pomm--state)))
+             (or (alist-get 'iteration (alist-get 'current pomm--state)) 0)
+             (pomm-third-time--break-time)
+             (or (alist-get 'context pomm--state) ""))
+     nil pomm-csv-history-file 'append 1)))
 
 (defun pomm-third-time-reset ()
   "Reset the Third Time timer."
@@ -166,13 +202,13 @@ This is an alist with the following keys:
      (alist-get 'kind (alist-get 'current pomm-third-time--state))))))
 
 (defun pomm-third-time--calc-eval (value)
-  "Convert VALUE to number.
+  "Evaluate VALUE and return number.
 
 If VALUE is not a string, return it.
 
 Otherwise, try to evaluate with `calc-eval'.  If unsuccessful, return
-calc error.  If the result is numeric, convert it to number and return
-it, otherwise, return a list with an error."
+the calc error.  If the result is numeric, convert it to number and
+return it, otherwise, return a value like a calc error."
   (if (stringp value)
       (let ((res (calc-eval value)))
         (if (listp res)
@@ -241,7 +277,7 @@ it, otherwise, return a list with an error."
 (defun pomm-third-time--dispatch-notification (kind)
   "Dispatch a notification about a start of a period.
 
-KIND is the same as in `pomm--state'"
+KIND is the same as in `pomm-third-time--state'"
   (alert
    (pcase kind
      ('break (concat pomm-third-time-break-message)
@@ -275,7 +311,7 @@ KIND is the same as in `pomm--state'"
     (run-hooks 'pomm-third-time-on-status-changed-hook)))
 
 (defun pomm-third-time--on-tick ()
-  "A function to execute on each time tick."
+  "Function to execute on each timer tick."
   (pcase (alist-get 'status pomm-third-time--state)
     ('stopped (when pomm-third-time--timer
                 (cancel-timer pomm-third-time--timer)
@@ -334,12 +370,12 @@ Take a look at the `pomm-third-time' function for more details."
          (setf (alist-get 'context pomm-third-time--state) nil))))))
 
 (defun pomm-third-time-switch ()
-  "Switch between work and break in the Third Time timer."
+  "Toggle work/break in the Third Time timer."
   (interactive)
   (pomm-third-time--switch))
 
 (defun pomm-third-time-format-mode-line ()
-  "Format mode string for the Third Time timer."
+  "Format the modeline string for the Third Time timer."
   (let ((current-status (alist-get 'status pomm-third-time--state)))
     (if (or (eq current-status 'stopped)
             (not (alist-get 'current pomm-third-time--state)))
@@ -376,6 +412,7 @@ Take a look at the `pomm-third-time' function for more details."
   (setf (alist-get 'context pomm-third-time--state)
         (prin1-to-string (read-minibuffer "Context: " (current-word)))))
 
+;;;###autoload
 (defun pomm-third-time-start-with-context ()
   "Prompt for context call call `pomm-third-time-start'."
   (interactive)
@@ -384,6 +421,7 @@ Take a look at the `pomm-third-time' function for more details."
 
 ;;;; Transient
 (defun pomm-third-time--completing-read-calc ()
+  "Do `completing-read' with `calc-eval'."
   (let ((res (completing-read
               "Time: "
               (lambda (string fun flag)
@@ -563,7 +601,36 @@ The class doesn't actually have any value, but this is necessary for transient."
 
 ;;;###autoload
 (defun pomm-third-time ()
-  "TODO"
+  "Implementation of the Third Time timer in Emacs.
+
+The idea of the technique is as follows:
+- Work as long as you need, take a break as 1/3 of the work time (the
+  fraction of work time to break time is set in
+  `pomm-third-time-fraction')
+- If you've ended a break early, unused break time is saved and added
+  to the next break within the same session.
+- If you've finished the session, either to take a longer break or to
+  end working, remaining break time is discarded.  Each session starts
+  from a clean slate.
+
+The timer can have two states:
+- Stopped.
+  Can be started with 's' or `pomm-third-time-start'.
+- Running.
+  Can be stopped with 'S' or `pomm-third-time-stop'.
+
+If the timer is running, the current period type (work or break) can
+be switched by 'b' or `pomm-third-time-switch'.  If the break time
+runs out, the timer automatically switches to work.
+
+The timer supports setting \"context\", for example, a task on which
+you're working on.  It can be set with '-c' or
+`pomm-third-time-set-context'.  This is useful together with CSV
+logging, which is enabled if `pomm-third-time-csv-history-file' is
+non-nil.
+
+Enable `pomm-mode-line-mode' to display the timer state in the
+modeline."
   (interactive)
   (unless pomm-third-time--state
     (pomm-third-time--init-state))
