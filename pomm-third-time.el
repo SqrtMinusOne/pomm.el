@@ -31,6 +31,8 @@
 
 ;;; Code:
 (require 'pomm)
+(require 'alert)
+(require 'transient)
 (require 'calc)
 
 (defgroup pomm-third-time nil
@@ -88,7 +90,8 @@ This is an alist with the following keys:
 - kind: same as in 'current
 - iteration
 - start-time: start timestamp
-- end-time: end timestamp")
+- end-time: end timestamp
+- context: context")
 
 (defvar pomm-third-time--timer nil
   "A variable for the Third Time timer.")
@@ -162,11 +165,30 @@ This is an alist with the following keys:
     (pomm--maybe-play-sound
      (alist-get 'kind (alist-get 'current pomm-third-time--state))))))
 
+(defun pomm-third-time--calc-eval (value)
+  "Convert VALUE to number.
+
+If VALUE is not a string, return it.
+
+Otherwise, try to evaluate with `calc-eval'.  If unsuccessful, return
+calc error.  If the result is numeric, convert it to number and return
+it, otherwise, return a list with an error."
+  (if (stringp value)
+      (let ((res (calc-eval value)))
+        (if (listp res)
+            res
+          (if (string-match-p (rx (+ num) (? (: "." (* num)))) value)
+              (string-to-number res)
+            (list nil (format  "Can't parse number: %s" res)))))
+    value))
+
 (defun pomm-third-time--fraction ()
   "Get fraction of break time to work time."
-  (if (stringp pomm-third-time-fraction)
-      (string-to-number (calc-eval pomm-third-time-fraction))
-    pomm-third-time-fraction))
+  (let ((parsed (pomm-third-time--calc-eval
+                 pomm-third-time-fraction)))
+    (if (listp parsed)
+        (user-error "Error in `pomm-third-time-fraction': %s" (card parsed))
+      parsed)))
 
 (defun pomm-third-time--current-period-time ()
   "Get the time spent in the current period."
@@ -200,11 +222,14 @@ This is an alist with the following keys:
         (current-start-time (alist-get 'start-time
                                        (alist-get 'current pomm-third-time--state)))
         (current-iteration (alist-get 'iteration
-                                      (alist-get 'current pomm-third-time--state))) )
+                                      (alist-get 'current pomm-third-time--state)))
+        (current-context (alist-get 'context pomm-third-time--state)))
     (when current-kind
       (push `((kind . ,current-kind)
               (start-time . ,current-start-time)
-              (end-time . ,(time-convert nil 'integer)))
+              (end-time . ,(time-convert nil 'integer))
+              (iteration . ,current-iteration)
+              (context . ,current-context))
             (alist-get 'history pomm-third-time--state)))))
 
 (defun pomm-third-time--format-period (seconds)
@@ -239,12 +264,12 @@ KIND is the same as in `pomm--state'"
          (next-kind (pcase current-kind
                       ('work 'break)
                       ('break 'work))))
+    (pomm-third-time--store-current-to-history)
     (setf (alist-get 'current pomm-third-time--state)
           `((kind . ,next-kind)
             (start-time . ,(time-convert nil 'integer))
             (break-time-bank . ,break-time)
             (iteration . ,iteration)))
-    (pomm-third-time--store-current-to-history)
     (pomm-third-time--dispatch-notification next-kind)
     (pomm-third-time--save-state)
     (run-hooks 'pomm-third-time-on-status-changed-hook)))
@@ -344,6 +369,205 @@ Take a look at the `pomm-third-time' function for more details."
     (remove-hook 'pomm-third-time-on-tick-hook #'force-mode-line-update)
     (remove-hook 'pomm-third-time-on-status-changed-hook #'pomm-third-time-update-mode-string)
     (remove-hook 'pomm-third-time-on-status-changed-hook #'force-mode-line-update)))
+
+(defun pomm-third-time-set-context ()
+  "Set the current context for the Third Time timer."
+  (interactive)
+  (setf (alist-get 'context pomm-third-time--state)
+        (prin1-to-string (read-minibuffer "Context: " (current-word)))))
+
+(defun pomm-third-time-start-with-context ()
+  "Prompt for context call call `pomm-third-time-start'."
+  (interactive)
+  (pomm-third-time-set-context)
+  (pomm-third-time-start))
+
+;;;; Transient
+(defun pomm-third-time--completing-read-calc ()
+  (let ((res (completing-read
+              "Time: "
+              (lambda (string fun flag)
+                (when (eq flag 'metadata)
+                  (let ((res (pomm-third-time--calc-eval string)))
+                    (if (listp res)
+                        (message (nth 1 res))
+                      (message "%f" res))))))))
+    (let ((eval-res (pomm-third-time--calc-eval res)))
+      (if (listp eval-res)
+          (user-error "Bad value: %s" (nth 1 eval-res))
+        res))))
+
+(transient-define-infix pomm-third-time--set-fraction ()
+  :class 'transient-lisp-variable
+  :variable 'pomm-third-time-fraction
+  :key "-f"
+  :description "Fraction of break time to work time:"
+  :reader (lambda (&rest _)
+            (let ((current-value pomm-third-time-fraction))
+              (condition-case error
+                  (pomm-third-time--completing-read-calc)
+                (error (progn
+                         (message "%s" error)
+                         current-value))))))
+
+(transient-define-infix pomm-third-time-set-reset-context-on-iteration-end ()
+  :class 'pomm--transient-lisp-variable-switch
+  :variable 'pomm-reset-context-on-iteration-end
+  :argument "--context-reset"
+  :key "-r"
+  :description "Reset the context on the interation end")
+
+(defclass pomm-third-time--set-context-infix (transient-variable)
+  ((transient :initform 'transient--do-call)
+   (always-read :initform t)))
+
+(cl-defmethod transient-init-value ((_ pomm-third-time--set-context-infix))
+  (alist-get 'context pomm-third-time--state))
+
+(cl-defmethod transient-infix-set ((_ pomm-third-time--set-context-infix) value)
+  (setf (alist-get 'context pomm-third-time--state) value))
+
+(cl-defmethod transient-prompt ((_ pomm-third-time--set-context-infix))
+  "Set context: ")
+
+(cl-defmethod transient-format-value ((_ pomm-third-time--set-context-infix))
+  (propertize (if-let (val (alist-get 'context pomm-third-time--state))
+                  (prin1-to-string val)
+                "unset")
+              'face 'transient-value))
+
+(transient-define-infix pomm-third-time--set-context ()
+  :class 'pomm-third-time--set-context-infix
+  :key "-c"
+  :description "Context:")
+
+(defclass pomm-third-time--transient-current (transient-suffix)
+  ((transient :initform t))
+  "A transient class to display the current state of the timer.")
+
+(cl-defmethod transient-init-value ((_ pomm-third-time--transient-current))
+  "A dummy method for `pomm-third-time--transient-current'.
+
+The class doesn't actually have any value, but this is necessary for transient."
+  nil)
+
+(defun pomm-third-time--get-kind-face (kind)
+  "Get a face for a KIND of period.
+
+KIND is the same as in `pomm-third-time--state'"
+  (pcase kind
+    ('work 'success)
+    ('break 'error)))
+
+(cl-defmethod transient-format ((_ pomm-third-time--transient-current))
+  "Format the state of the Third Time timer."
+  (let ((status (alist-get 'status pomm-third-time--state)))
+    (if (or (eq 'stopped status) (not (alist-get 'current pomm-third-time--state)))
+        "The timer is not running"
+      (let ((kind (alist-get 'kind (alist-get 'current pomm-third-time--state)))
+            (start-time (alist-get 'start-time
+                                   (alist-get 'current pomm-third-time--state)))
+            (iteration (alist-get 'iteration
+                                  (alist-get 'current pomm-third-time--state)))
+            (break-time (pomm-third-time--break-time))
+            (period-time (pomm-third-time--current-period-time)))
+        (concat
+         (format "Iteration #%d. " iteration)
+         "State: "
+         (propertize
+          (upcase (symbol-name kind))
+          'face
+          (pomm-third-time--get-kind-face kind))
+         ". Time: "
+         (propertize
+          (pomm-third-time--format-period period-time)
+          'face 'success)
+         " (started at "
+         (propertize
+          (format-time-string "%H:%M:%S" (seconds-to-time start-time))
+          'face 'success)
+         "). Available break time: "
+         (propertize
+          (pomm-third-time--format-period break-time)
+          'face 'success))))))
+
+(defclass pomm-third-time--transient-history (transient-suffix)
+  ((transient :initform t))
+  "A transient class to display the history of the pomodoro timer.")
+
+(cl-defmethod transient-init-value ((_ pomm-third-time--transient-history))
+  "A dummy method for `pomm-third-time--transient-history'.
+
+The class doesn't actually have any value, but this is necessary for transient."
+  nil)
+
+(cl-defmethod transient-format ((_ pomm-third-time--transient-history))
+  "Format the history list for the transient buffer"
+  (if (not (alist-get 'history pomm-third-time--state))
+      "No history yet"
+    (let ((previous-iteration 1000))
+      (mapconcat
+       (lambda (item)
+         (let ((kind (alist-get 'kind item))
+               (iteration (alist-get 'iteration item))
+               (start-time (alist-get 'start-time item))
+               (end-time (alist-get 'end-time item))
+               (context (alist-get 'context item)))
+           (concat
+            (if (< iteration previous-iteration)
+                (let ((is-first (= previous-iteration 1000)))
+                  (setq previous-iteration iteration)
+                  (if is-first
+                      ""
+                    "\n"))
+              "")
+            (format "[%02d] " iteration)
+            (propertize
+             (format "%12s  " (upcase (symbol-name kind)))
+             'face (pomm-third-time--get-kind-face kind))
+            (format-time-string "%H:%M" (seconds-to-time start-time))
+            "-"
+            (format-time-string "%H:%M" (seconds-to-time end-time))
+            (if context
+                (format " : %s" (propertize context 'face 'transient-value))
+              ""))))
+       (alist-get 'history pomm-third-time--state)
+       "\n"))))
+
+(transient-define-infix pomm-third-time--transient-current-suffix ()
+  :class 'pomm-third-time--transient-current
+  :key "~~2")
+
+(transient-define-infix pomm-third-time--transient-history-suffix ()
+  :class 'pomm-third-time--transient-history
+  :key "~~1")
+
+(transient-define-prefix pomm-third-time-transient ()
+  ["Timer settings"
+   (pomm-third-time--set-fraction)]
+  ["Context settings"
+   (pomm-third-time--set-context)
+   (pomm-third-time-set-reset-context-on-iteration-end)]
+  ["Commands"
+   :class transient-row
+   ("s" "Start the timer" pomm-third-time-start :transient t)
+   ("S" "Stop the timer" pomm-third-time-stop :transient t)
+   ("b" "Switch work/break" pomm-third-time-switch :transient t)
+   ("R" "Reset" pomm-third-time-reset :transient t)
+   ("u" "Update" pomm--transient-update :transient t)
+   ("q" "Quit" transient-quit-one)]
+  ["Status"
+   (pomm-third-time--transient-current-suffix)]
+  ["History"
+   (pomm-third-time--transient-history-suffix)])
+
+;;;###autoload
+(defun pomm-third-time ()
+  "TODO"
+  (interactive)
+  (unless pomm-third-time--state
+    (pomm-third-time--init-state))
+  (call-interactively #'pomm-third-time-transient))
 
 (provide 'pomm-third-time)
 ;;; pomm-third-time.el ends here
