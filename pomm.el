@@ -634,14 +634,18 @@ minor mode."
    (variable :initarg :variable)))
 
 (cl-defmethod transient-init-value ((obj pomm--transient-lisp-variable-switch))
-  "Initialize the value for the `pomm--transient-lisp-variable-switch'."
+  "Initialize the value for the `pomm--transient-lisp-variable-switch'.
+
+OBJ is an instance of the class."
   (oset obj value
         (symbol-value (oref obj variable))))
 
 (cl-defmethod transient-infix-read ((obj pomm--transient-lisp-variable-switch))
   "Toggle the value of the `pomm--transient-lisp-variable-switch'.
 
-This changes both the value of the variable and the value of the class."
+This changes both the value of the variable and the value of the class.
+
+OBJ is an instance of the class."
   (oset obj value
         (set (oref obj variable)
              (not (symbol-value (oref obj variable))))))
