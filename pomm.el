@@ -272,7 +272,9 @@ start of the timer."
         (if (not (string-empty-p data))
             (setq pomm--state (car (read-from-string data)))
           (pomm--do-reset)))))
-  (pomm--cleanup-old-history))
+  (pomm--cleanup-old-history)
+  (when (eq (alist-get 'status pomm--state) 'running)
+    (setq pomm--timer (run-with-timer 0 1 #'pomm--on-tick))))
 
 (defun pomm--save-state ()
   "Save the current Pomodoro timer state."

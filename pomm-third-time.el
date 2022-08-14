@@ -145,7 +145,9 @@ This is an alist with the following keys:
         (if (not (string-empty-p data))
             (setq pomm-third-time--state (car (read-from-string data)))
           (pomm-third-time--do-reset)))))
-  (pomm-third-time--cleanup-old-history))
+  (pomm-third-time--cleanup-old-history)
+  (when (eq (alist-get 'status pomm-third-time--state) 'running)
+    (setq pomm--timer (run-with-timer 0 1 #'pomm-third-time--on-tick))))
 
 (defun pomm-third-time--save-state ()
   "Save the current Third Time timer state."
