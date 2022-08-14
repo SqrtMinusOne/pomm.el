@@ -130,7 +130,7 @@ This is an alist with the following keys:
 (defun pomm-third-time--init-state ()
   "Initialize the Third Time timer state."
   (add-hook 'pomm-third-time-on-status-changed-hook #'pomm-third-time--save-state)
-  (add-hook 'pomm-on-status-changed-hook #'pomm-third-time--maybe-save-csv)
+  (add-hook 'pomm-third-time-on-status-changed-hook #'pomm-third-time--maybe-save-csv)
   (add-hook 'pomm-third-time-on-status-changed-hook
             #'pomm-third-time--dispatch-current-sound)
   (add-hook 'pomm-mode-line-mode-hook
@@ -179,12 +179,12 @@ If the variable is nil, the function does nothing."
     (write-region
      (format "%s,%s,%s,%d,%d,%s\n"
              (format-time-string pomm-csv-history-file-timestamp-format)
-             (symbol-name (alist-get 'status pomm--state))
-             (symbol-name (alist-get 'kind (alist-get 'current pomm--state)))
-             (or (alist-get 'iteration (alist-get 'current pomm--state)) 0)
+             (symbol-name (alist-get 'status pomm-third-time--state))
+             (symbol-name (alist-get 'kind (alist-get 'current pomm-third-time--state)))
+             (or (alist-get 'iteration (alist-get 'current pomm-third-time--state)) 0)
              (pomm-third-time--break-time)
-             (or (alist-get 'context pomm--state) ""))
-     nil pomm-csv-history-file 'append 1)))
+             (alist-get 'context pomm--state) "")
+     nil pomm-third-time-csv-history-file 'append 1)))
 
 (defun pomm-third-time-reset ()
   "Reset the Third Time timer."
@@ -245,6 +245,26 @@ return it, otherwise, return a value like a calc error."
         ('break (- (pomm-third-time--current-period-time)))
         ('nil 0)))
    0))
+
+(defun pomm-third-time--worked-time ()
+  "Get total time worked in the current iteration."
+  (let ((iteration (alist-get 'iteration
+                              (alist-get 'current pomm-third-time--state)))
+        (current-kind (alist-get 'kind (alist-get 'current pomm-third-time--state))))
+    (apply
+     #'+
+     (if (eq current-kind 'work)
+         (pomm-third-time--current-period-time)
+       0)
+     (mapcar
+      (lambda (item)
+        (- (alist-get 'end-time item)
+           (alist-get 'start-time item)))
+      (seq-filter
+       (lambda (item)
+         (and (= (alist-get 'iteration item) iteration)
+              (eq (alist-get 'kind item) 'work)))
+       (alist-get 'history pomm-third-time--state))))))
 
 (defun pomm-third-time--need-switch-p ()
   "Check if the break period has to end."
@@ -527,9 +547,13 @@ KIND is the same as in `pomm-third-time--state'"
          (propertize
           (format-time-string "%H:%M:%S" (seconds-to-time start-time))
           'face 'success)
-         "). Available break time: "
+         ")\nAvailable break time: "
          (propertize
           (pomm-third-time--format-period break-time)
+          'face 'success)
+         ". Total time worked: "
+         (propertize
+          (pomm-third-time--format-period (pomm-third-time--worked-time))
           'face 'success))))))
 
 (defclass pomm-third-time--transient-history (transient-suffix)
