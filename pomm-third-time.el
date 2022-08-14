@@ -115,6 +115,7 @@ This is an alist with the following keys:
 
 (defun pomm-third-time--do-reset ()
   "Reset the Third Time timer state."
+  (interactive)
   (when pomm-third-time--timer
     (cancel-timer pomm-third-time--timer)
     (setq pomm-third-time--timer nil))
@@ -190,7 +191,7 @@ If the variable is nil, the function does nothing."
 
 (transient-define-prefix pomm-third-time-reset ()
   ["Are you sure you want to reset the Third Time timer?"
-   ("y" "Yes" (lambda () (interactive) (pomm-third-time--do-reset)))
+   ("y" "Yes" pomm-third-time--do-reset)
    ("n" "No" transient-quit-one)])
 
 (defun pomm-third-time--dispatch-current-sound ()
@@ -378,19 +379,23 @@ Take a look at the `pomm-third-time' function for more details."
   "Check if the timer is running."
   (eq (alist-get 'status pomm-third-time--state) 'running))
 
+(defun pomm-third-time--stop ()
+  "Stop the running Third Time timer."
+  (interactive)
+  (unless (pomm-third-time--can-stop-p)
+    (user-error "The timer is not running!"))
+  (pomm-third-time--store-current-to-history)
+  (setf (alist-get 'status pomm-third-time--state) 'stopped
+        (alist-get 'current pomm-third-time--state) nil
+        (alist-get 'last-changed-time pomm-third-time--state)
+        (time-convert nil 'integer))
+  (run-hooks 'pomm-third-time-on-status-changed-hook)
+  (when pomm-reset-context-on-iteration-end
+    (setf (alist-get 'context pomm-third-time--state) nil)))
+
 (transient-define-prefix pomm-third-time-stop ()
   ["This will reset the accumulated break time. Continue?"
-   ("y" "Yes" (lambda () (interactive)
-                (unless (pomm-third-time--can-stop-p)
-                  (user-error "The timer is not running!"))
-                (pomm-third-time--store-current-to-history)
-                (setf (alist-get 'status pomm-third-time--state) 'stopped
-                      (alist-get 'current pomm-third-time--state) nil
-                      (alist-get 'last-changed-time pomm-third-time--state)
-                      (time-convert nil 'integer))
-                (run-hooks 'pomm-third-time-on-status-changed-hook)
-                (when pomm-reset-context-on-iteration-end
-                  (setf (alist-get 'context pomm-third-time--state) nil))))
+   ("y" "Yes" pomm-third-time--stop)
    ("n" "No" transient-quit-one)])
 
 (defun pomm-third-time-switch ()

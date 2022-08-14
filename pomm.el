@@ -242,6 +242,7 @@ Updated by `pomm-update-mode-line-string'.")
 
 (defun pomm--do-reset ()
   "Reset the pomodoro timer state."
+  (interactive)
   (when pomm--timer
     (cancel-timer pomm--timer)
     (setq pomm--timer nil))
@@ -316,7 +317,7 @@ variable doesn't exist, function does nothing."
 
 (transient-define-prefix pomm-reset ()
   ["Are you sure you want to reset the Pomodoro timer?"
-   ("y" "Yes" (lambda () (interactive) (pomm--do-reset)))
+   ("y" "Yes" pomm--do-reset)
    ("n" "No" transient-quit-one)])
 
 (defun pomm--maybe-play-sound (kind)
