@@ -375,14 +375,10 @@ Take a look at the `pomm-third-time' function for more details."
   (unless pomm-third-time--timer
     (setq pomm-third-time--timer (run-with-timer 0 1 'pomm-third-time--on-tick))))
 
-(defun pomm-third-time--running-p ()
-  "Check if the timer is running."
-  (eq (alist-get 'status pomm-third-time--state) 'running))
-
 (defun pomm-third-time--stop ()
   "Stop the running Third Time timer."
   (interactive)
-  (unless (pomm-third-time--can-stop-p)
+  (unless (eq (alist-get 'status pomm-third-time--state) 'running)
     (user-error "The timer is not running!"))
   (pomm-third-time--store-current-to-history)
   (setf (alist-get 'status pomm-third-time--state) 'stopped
