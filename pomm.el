@@ -1,10 +1,10 @@
-;;; pomm.el --- Yet another Pomodoro timer implementation -*- lexical-binding: t -*-
+;;; pomm.el --- Pomodoro and Third Time timers -*- lexical-binding: t -*-
 
-;; Copyright (C) 2021 Korytov Pavel
+;; Copyright (C) 2022 Korytov Pavel
 
 ;; Author: Korytov Pavel <thexcloud@gmail.com>
 ;; Maintainer: Korytov Pavel <thexcloud@gmail.com>
-;; Version: 0.1.4
+;; Version: 0.2.0
 ;; Package-Requires: ((emacs "27.1") (alert "1.2") (seq "2.22") (transient "0.3.0"))
 ;; Homepage: https://github.com/SqrtMinusOne/pomm.el
 
@@ -25,14 +25,16 @@
 
 ;;; Commentary:
 
-;; An implementation of a Pomodoro timer for Emacs.  Distintive features
-;; of this particular implementation:
-;; - Managing the timer with transient.el (`pomm' command)
+;; Implementation of two time management methods in Emacs: Pomodoro
+;; and Third Time.
+;; This implementation features:
+;; - Managing the timer with transient.el
 ;; - Persistent state between Emacs sessions.
 ;;   So one could close & reopen Emacs without interruption the timer.
 ;;
-;; Take a look at `pomm-update-mode-line-string' on how to setup this
-;; package with a modeline.
+;; Main entrypoints are: `pomm' for Pomodoro and `pomm-third-time' for
+;; Third Time.
+;;
 ;; Also take a look at README at
 ;; <https://github.com/SqrtMinusOne/pomm.el> for more information.
 
@@ -43,7 +45,7 @@
 (require 'transient)
 
 (defgroup pomm nil
-  "Yet another Pomodoro timer implementation."
+  "Pomodoro and Third Time timers."
   :group 'tools)
 
 (defcustom pomm-work-period 25
@@ -77,12 +79,12 @@
   :type 'string)
 
 (defcustom pomm-ask-before-long-break t
-  "Ask a user whether to do a long break or stop the pomodoros."
+  "Ask the user whether to do a long break or stop the pomodoros."
   :group 'pomm
   :type 'boolean)
 
 (defcustom pomm-ask-before-work nil
-  "Ask a user whether to start a new pomodoro period."
+  "Ask the user whether to start a new pomodoro period."
   :group 'pomm
   :type 'boolean)
 
@@ -120,9 +122,9 @@ The format is the same as in `format-seconds'"
   :type 'string)
 
 (defcustom pomm-csv-history-file nil
-  "The csv history file location.
+  "If non-nil, save timer history in a CSV format.
 
-The parent directory has to exists!
+The parent directory has to exist!
 
 A new entry is written whenever the timer changes status or kind
 of period.  The format is as follows:
@@ -173,9 +175,8 @@ When loading the package, `load-file-name' should point to the
 location of this file, which means that resources folder should
 be in the same directory.
 
-If the file is evaluated interactively (for development
-purposes), the `default-directory' is most likely the project
-root."
+If the file is evaluated interactively (for development purposes), the
+`default-directory' variable is most likely the project root."
   (or (and load-file-name (concat (file-name-directory load-file-name) name))
       (concat default-directory name)))
 
@@ -183,6 +184,7 @@ root."
   `((work . ,(pomm--get-sound-file-path "resources/bell.wav"))
     (tick . ,(pomm--get-sound-file-path "resources/tick.wav"))
     (short-break . ,(pomm--get-sound-file-path "resources/bell.wav"))
+    (break . ,(pomm--get-sound-file-path "resources/bell.wav"))
     (long-break . ,(pomm--get-sound-file-path "resources/bell.wav"))
     (stop . ,(pomm--get-sound-file-path "resources/air_horn.wav")))
   "Paths to the sounds to play on various events.
@@ -191,7 +193,7 @@ Each element of the list is a cons cell, where:
 - key is an event type
 - value is either a path to the sound file or nil."
   :group 'pomm
-  :options '(work tick short-break long-break stop)
+  :options '(work tick break short-break long-break stop)
   :type '(alist :key-type (symbol :tag "Event")
                 :value-type (choice (string :tag "Path")
                                     (const nil :tag "No sound"))))
@@ -206,18 +208,13 @@ Each element of the list is a cons cell, where:
   :group 'pomm
   :type 'hook)
 
-(defcustom pomm-on-period-changed-hook nil
-  "A hook to run on a period status change."
-  :group 'pomm
-  :type 'hook)
-
 (defvar pomm--state nil
-  "The current state of pomm.el.
+  "The current state of the Pomodoro timer.
 
-This is an alist of with the following keys:
+This is an alist with the following keys:
 - status: either 'stopped, 'paused or 'running
 - current: an alist with a current period
-- history: a list with today's history
+- history: a list with history for today
 - last-changed-time: a timestamp of the last change in status
 - context: a string that describes the current task
 
@@ -225,14 +222,15 @@ This is an alist of with the following keys:
 - kind: either 'short-break, 'long-break or 'work
 - start-time: start timestamp
 - effective-start-time: start timestamp, corrected for pauses
-- iteration: number the current Pomodoro iteration
+- iteration: number of the current Pomodoro iteration
 
 History is a list of alists with the following keys:
 - kind: same as in current
 - iteration
 - start-time: start timestamp
 - end-time: end timestamp
-- paused-time: time spent in a paused state")
+- paused-time: time spent in a paused state
+- context: current context.")
 
 (defvar pomm--timer nil
   "A variable for the pomm timer.")
@@ -260,11 +258,10 @@ Updated by `pomm-update-mode-line-string'.")
 (defun pomm--init-state ()
   "Initialize the Pomodoro timer state.
 
-This function is meant to be ran only once, at the first start of the timer."
+This function is meant to be executed only once, at the first
+start of the timer."
   (add-hook 'pomm-on-status-changed-hook #'pomm--save-state)
   (add-hook 'pomm-on-status-changed-hook #'pomm--maybe-save-csv)
-  (add-hook 'pomm-on-period-changed-hook #'pomm--maybe-save-csv)
-  (add-hook 'pomm-on-period-changed-hook #'pomm--dispatch-current-sound)
   (add-hook 'pomm-on-status-changed-hook #'pomm--dispatch-current-sound)
   (if (or (not (file-exists-p pomm-state-file-location))
           (not pomm-state-file-location))
@@ -275,7 +272,9 @@ This function is meant to be ran only once, at the first start of the timer."
         (if (not (string-empty-p data))
             (setq pomm--state (car (read-from-string data)))
           (pomm--do-reset)))))
-  (pomm--cleanup-old-history))
+  (pomm--cleanup-old-history)
+  (when (eq (alist-get 'status pomm--state) 'running)
+    (setq pomm--timer (run-with-timer 0 1 #'pomm--on-tick))))
 
 (defun pomm--save-state ()
   "Save the current Pomodoro timer state."
@@ -315,11 +314,10 @@ variable doesn't exist, function does nothing."
              (or (alist-get 'context pomm--state) ""))
      nil pomm-csv-history-file 'append 1)))
 
-(defun pomm-reset ()
-  "Reset the Pomodoro timer."
-  (interactive)
-  (when (y-or-n-p "Are you sure you want to reset the Pomodoro timer? ")
-    (pomm--do-reset)))
+(transient-define-prefix pomm-reset ()
+  ["Are you sure you want to reset the Pomodoro timer?"
+   ("y" "Yes" (lambda () (interactive) (pomm--do-reset)))
+   ("n" "No" transient-quit-one)])
 
 (defun pomm--maybe-play-sound (kind)
   "Play a sound of KIND.
@@ -355,7 +353,7 @@ which can be played by `pomm-audio-player-executable'."
 KIND is the same as in `pomm--state'"
   (alert
    (pcase kind
-     ('short-break pomm-short-break-message)
+     ((or 'break 'short-break) pomm-short-break-message)
      ('long-break pomm-long-break-message)
      ('work pomm-work-message))
    :title "Pomodoro"))
@@ -458,7 +456,7 @@ The condition is: (effective-start-time + length) < now."
       (setf (alist-get 'context pomm--state) nil))))
 
 (defun pomm--on-tick ()
-  "A function to be ran on a timer tick."
+  "A function to execute on each timer tick."
   (pcase (alist-get 'status pomm--state)
     ('stopped (when pomm--timer
                 (cancel-timer pomm--timer)
@@ -565,6 +563,7 @@ minor mode."
   (setf (alist-get 'context pomm--state)
         (prin1-to-string (read-minibuffer "Context: " (current-word)))))
 
+;;;###autoload
 (defun pomm-start-with-context ()
   "Prompt for context and call `pomm-start'."
   (interactive)
@@ -631,21 +630,30 @@ minor mode."
             (read-number "Number of work periods before a long break:"
                          pomm-number-of-periods)))
 
-(defclass pomm--set-context-on-iteration-end-infix (transient-switch)
-  ((transient :initform t))
-  "A transient class to toggle `pomm-reset-context-on-iteration-end'.")
+(defclass pomm--transient-lisp-variable-switch (transient-switch)
+  ((transient :initform t)
+   (variable :initarg :variable)))
 
-(cl-defmethod transient-init-value ((obj pomm--set-context-on-iteration-end-infix))
+(cl-defmethod transient-init-value ((obj pomm--transient-lisp-variable-switch))
+  "Initialize the value for the `pomm--transient-lisp-variable-switch'.
+
+OBJ is an instance of the class."
   (oset obj value
-        pomm-reset-context-on-iteration-end))
+        (symbol-value (oref obj variable))))
 
-(cl-defmethod transient-infix-read ((_ pomm--set-context-on-iteration-end-infix))
-  "Toggle the switch on or off."
-  (setq pomm-reset-context-on-iteration-end
-        (not pomm-reset-context-on-iteration-end)))
+(cl-defmethod transient-infix-read ((obj pomm--transient-lisp-variable-switch))
+  "Toggle the value of the `pomm--transient-lisp-variable-switch'.
+
+This changes both the value of the variable and the value of the class.
+
+OBJ is an instance of the class."
+  (oset obj value
+        (set (oref obj variable)
+             (not (symbol-value (oref obj variable))))))
 
 (transient-define-infix pomm--set-reset-context-on-iteration-end ()
-  :class 'pomm--set-context-on-iteration-end-infix
+  :class 'pomm--transient-lisp-variable-switch
+  :variable 'pomm-reset-context-on-iteration-end
   :argument "--context-reset"
   :key "-r"
   :description "Reset the context on the interation end")
@@ -655,15 +663,19 @@ minor mode."
    (always-read :initform t)))
 
 (cl-defmethod transient-init-value ((_ pomm--set-context-infix))
+  "Initialize the value of the context infix from `pomm-state'."
   (alist-get 'context pomm--state))
 
 (cl-defmethod transient-infix-set ((_ pomm--set-context-infix) value)
+  "Update `pomm-state' with VALUE from the context infix."
   (setf (alist-get 'context pomm--state) value))
 
 (cl-defmethod transient-prompt ((_ pomm--set-context-infix))
+  "Return the prompt text for the context infix."
   "Set context: ")
 
 (cl-defmethod transient-format-value ((_ pomm--set-context-infix))
+  "Format value for the context infix."
   (propertize (if-let (val (alist-get 'context pomm--state))
                   (prin1-to-string val)
                 "unset")
@@ -821,7 +833,15 @@ The timer can have 3 states:
   'S' / `pomm-stop'.
 - Running.
   Can be paused with 'p' / `pomm-pause' or stopped with 'S' /
-  `pomm-stop'."
+  `pomm-stop'.
+
+The timer supports setting \"context\", for example, a task on which
+you're working on.  It can be set with '-c' or `pomm-set-context'.
+This is useful together with CSV logging, which is enabled if
+`pomm-csv-history-file' is non-nil.
+
+Enable `pomm-mode-line-mode' to display the timer state in the
+modeline."
   (interactive)
   (unless pomm--state
     (pomm--init-state))
