@@ -312,11 +312,10 @@ variable doesn't exist, function does nothing."
              (or (alist-get 'context pomm--state) ""))
      nil pomm-csv-history-file 'append 1)))
 
-(defun pomm-reset ()
-  "Reset the Pomodoro timer."
-  (interactive)
-  (when (y-or-n-p "Are you sure you want to reset the Pomodoro timer? ")
-    (pomm--do-reset)))
+(transient-define-prefix pomm-reset ()
+  ["Are you sure you want to reset the Pomodoro timer?"
+   ("y" "Yes" (lambda () (interactive) (pomm--do-reset)))
+   ("n" "No" transient-quit-one)])
 
 (defun pomm--maybe-play-sound (kind)
   "Play a sound of KIND.

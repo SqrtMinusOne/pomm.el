@@ -186,11 +186,10 @@ If the variable is nil, the function does nothing."
              (alist-get 'context pomm--state) "")
      nil pomm-third-time-csv-history-file 'append 1)))
 
-(defun pomm-third-time-reset ()
-  "Reset the Third Time timer."
-  (interactive)
-  (when (y-or-n-p "Are you sure you want to reset the Third Time timer? ")
-    (pomm-third-time--do-reset)))
+(transient-define-prefix pomm-third-time-reset ()
+  ["Are you sure you want to reset the Third Time timer?"
+   ("y" "Yes" (lambda () (interactive) (pomm-third-time--do-reset)))
+   ("n" "No" transient-quit-one)])
 
 (defun pomm-third-time--dispatch-current-sound ()
   "Dispatch an appropriate sound for the current state of the timer."
@@ -373,21 +372,24 @@ Take a look at the `pomm-third-time' function for more details."
   (unless pomm-third-time--timer
     (setq pomm-third-time--timer (run-with-timer 0 1 'pomm-third-time--on-tick))))
 
-(defun pomm-third-time-stop ()
-  "Stop the Third Time timer."
-  (interactive)
-  (pcase (alist-get 'status pomm-third-time--state)
-    ('stopped (message "The timer is already stopped!"))
-    ('running
-     (when (y-or-n-p "This will reset the accumulated break time.  Continue? ")
-       (pomm-third-time--store-current-to-history)
-       (setf (alist-get 'status pomm-third-time--state) 'stopped
-             (alist-get 'current pomm-third-time--state) nil
-             (alist-get 'last-changed-time pomm-third-time--state)
-             (time-convert nil 'integer))
-       (run-hooks 'pomm-third-time-on-status-changed-hook)
-       (when pomm-reset-context-on-iteration-end
-         (setf (alist-get 'context pomm-third-time--state) nil))))))
+(defun pomm-third-time--running-p ()
+  "Check if the timer is running."
+  (eq (alist-get 'status pomm-third-time--state) 'running))
+
+(transient-define-prefix pomm-third-time-stop ()
+  ["This will reset the accumulated break time. Continue?"
+   ("y" "Yes" (lambda () (interactive)
+                (unless (pomm-third-time--can-stop-p)
+                  (user-error "The timer is not running!"))
+                (pomm-third-time--store-current-to-history)
+                (setf (alist-get 'status pomm-third-time--state) 'stopped
+                      (alist-get 'current pomm-third-time--state) nil
+                      (alist-get 'last-changed-time pomm-third-time--state)
+                      (time-convert nil 'integer))
+                (run-hooks 'pomm-third-time-on-status-changed-hook)
+                (when pomm-reset-context-on-iteration-end
+                  (setf (alist-get 'context pomm-third-time--state) nil))))
+   ("n" "No" transient-quit-one)])
 
 (defun pomm-third-time-switch ()
   "Toggle work/break in the Third Time timer."
@@ -616,6 +618,8 @@ The class doesn't actually have any value, but this is necessary for transient."
   ["Commands"
    :class transient-row
    ("s" "Start the timer" pomm-third-time-start :transient t)
+   ;; XXX I tried to use the `:if' predicate here, but unfortunately
+   ;; visibilty doesn't refresh with `:transient t'
    ("S" "Stop the timer" pomm-third-time-stop :transient t)
    ("b" "Switch work/break" pomm-third-time-switch :transient t)
    ("R" "Reset" pomm-third-time-reset :transient t)
