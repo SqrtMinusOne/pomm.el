@@ -23,7 +23,7 @@ My preferred way is =use-package= with =straight.el=:
 #+begin_src emacs-lisp
 (use-package pomm
   :straight t
-  :commands (pomm pomm-thrid-time))
+  :commands (pomm pomm-third-time))
 #+end_src
 
 Or you can clone the repository, add the package to the =load-path= and load it with =require=:
