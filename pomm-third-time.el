@@ -126,7 +126,7 @@ This is an alist with the following keys:
           (last-changed-time ,(time-convert nil 'integer)))
         pomm-current-mode-line-string "")
   (setf (alist-get 'status pomm-third-time--state) 'stopped)
-  (run-hooks 'pomm-on-status-changed-hook))
+  (run-hooks 'pomm-third-time-on-status-changed-hook))
 
 (defun pomm-third-time--init-state ()
   "Initialize the Third Time timer state."
