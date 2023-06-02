@@ -248,14 +248,15 @@ return it, otherwise, return a value like a calc error."
         ('nil 0)))
    0))
 
-(defun pomm-third-time--worked-time ()
-  "Get total time worked in the current iteration."
-  (let ((iteration (alist-get 'iteration
-                              (alist-get 'current pomm-third-time--state)))
-        (current-kind (alist-get 'kind (alist-get 'current pomm-third-time--state))))
+(defun pomm-third-time--total-time (&optional kind)
+  "Get total time spent in `state` in the current iteration."
+  (let* ((kind (if kind kind 'work))
+         (iteration (alist-get 'iteration
+                               (alist-get 'current pomm-third-time--state)))
+         (current-kind (alist-get 'kind (alist-get 'current pomm-third-time--state))))
     (apply
      #'+
-     (if (eq current-kind 'work)
+     (if (eq current-kind kind)
          (pomm-third-time--current-period-time)
        0)
      (mapcar
@@ -265,8 +266,9 @@ return it, otherwise, return a value like a calc error."
       (seq-filter
        (lambda (item)
          (and (= (alist-get 'iteration item) iteration)
-              (eq (alist-get 'kind item) 'work)))
+              (eq (alist-get 'kind item) kind)))
        (alist-get 'history pomm-third-time--state))))))
+
 
 (defun pomm-third-time--need-switch-p ()
   "Check if the break period has to end."
@@ -536,7 +538,9 @@ KIND is the same as in `pomm-third-time--state'"
             (iteration (alist-get 'iteration
                                   (alist-get 'current pomm-third-time--state)))
             (break-time (pomm-third-time--break-time))
-            (period-time (pomm-third-time--current-period-time)))
+            (period-time (pomm-third-time--current-period-time))
+            (total-work (pomm-third-time--total-time 'work))
+            (total-break (pomm-third-time--total-time 'break)))
         (concat
          (format "Iteration #%d. " iteration)
          "State: "
@@ -556,9 +560,17 @@ KIND is the same as in `pomm-third-time--state'"
          (propertize
           (pomm-third-time--format-period break-time)
           'face 'success)
-         ". Total time worked: "
+         ".\nTotal time worked: "
          (propertize
-          (pomm-third-time--format-period (pomm-third-time--worked-time))
+          (pomm-third-time--format-period total-work)
+          'face 'success)
+         ". Total time braked: "
+         (propertize
+          (pomm-third-time--format-period total-break)
+          'face 'success)
+         ". Total time tracked: "
+         (propertize
+          (pomm-third-time--format-period (+ total-work total-break))
           'face 'success))))))
 
 (defclass pomm-third-time--transient-history (transient-suffix)
