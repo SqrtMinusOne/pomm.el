@@ -1,12 +1,13 @@
 ;;; pomm.el --- Pomodoro and Third Time timers -*- lexical-binding: t -*-
 
-;; Copyright (C) 2022 Korytov Pavel
+;; Copyright (C) 2023 Korytov Pavel
 
 ;; Author: Korytov Pavel <thexcloud@gmail.com>
 ;; Maintainer: Korytov Pavel <thexcloud@gmail.com>
 ;; Version: 0.2.0
 ;; Package-Requires: ((emacs "27.1") (alert "1.2") (seq "2.22") (transient "0.3.0"))
 ;; Homepage: https://github.com/SqrtMinusOne/pomm.el
+;; Published-At: 2021-11-05
 
 ;; This file is NOT part of GNU Emacs.
 
