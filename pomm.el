@@ -103,7 +103,7 @@
   (locate-user-emacs-file "pomm")
   "Location of the pomm state file."
   :group 'pomm
-  :type 'string)
+  :type 'file)
 
 (defcustom pomm-history-reset-hour 0
   "An hour on which the history will be reset.
@@ -135,7 +135,7 @@ of period.  The format is as follows:
 - iteration
 - context"
   :group 'pomm
-  :type 'string)
+  :type '(choice file (const nil)))
 
 (defcustom pomm-csv-history-file-timestamp-format "%s"
   "Timestamp format in the csv file.
