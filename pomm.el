@@ -45,6 +45,11 @@
 (require 'eieio)
 (require 'transient)
 
+;; XXX optional dependency on org-clock
+(declare-function "org-clock-in-last" "org-clock")
+(declare-function "org-clock-out" "org-clock")
+(defvar org-clock-current-task)
+
 (defgroup pomm nil
   "Pomodoro and Third Time timers."
   :group 'tools)
@@ -220,14 +225,14 @@ If nil, the clock in happens after the first command."
   "The current state of the Pomodoro timer.
 
 This is an alist with the following keys:
-- status: either 'stopped, 'paused or 'running
+- status: either \\='stopped, \\='paused or \\='running
 - current: an alist with a current period
 - history: a list with history for today
 - last-changed-time: a timestamp of the last change in status
 - context: a string that describes the current task
 
-'current is also an alist with the following keys:
-- kind: either 'short-break, 'long-break or 'work
+\\='current is also an alist with the following keys:
+- kind: either \\='short-break, \\='long-break or \\='work
 - start-time: start timestamp
 - effective-start-time: start timestamp, corrected for pauses
 - iteration: number of the current Pomodoro iteration
@@ -484,7 +489,7 @@ The condition is: (effective-start-time + length) < now."
 
 The formula is:
 \(effective-start-time + length\) - now + paused-time,
-where paused-time is 0 if status is not 'paused, otherwise:
+where paused-time is 0 if status is not \\='paused, otherwise:
 paused-time := now - last-changed-time"
   (+
    (+ (or (alist-get 'effective-start-time (alist-get 'current pomm--state)) 0)
@@ -866,17 +871,17 @@ This command initializes the timer and triggers the transient buffer.
 
 The timer can have 3 states:
 - Stopped.
-  Can be started with 's' or `pomm-start'.  A new iteration of the
+  Can be started with \\='s' or `pomm-start'.  A new iteration of the
   timer will be started.
 - Paused.
-  Can be continuted with 's' / `pomm-start' or stopped competely with
-  'S' / `pomm-stop'.
+  Can be continuted with \\='s' / `pomm-start' or stopped competely with
+  \\='S' / `pomm-stop'.
 - Running.
-  Can be paused with 'p' / `pomm-pause' or stopped with 'S' /
+  Can be paused with \\='p' / `pomm-pause' or stopped with \\='S' /
   `pomm-stop'.
 
 The timer supports setting \"context\", for example, a task on which
-you're working on.  It can be set with '-c' or `pomm-set-context'.
+you're working on.  It can be set with \\='-c' or `pomm-set-context'.
 This is useful together with CSV logging, which is enabled if
 `pomm-csv-history-file' is non-nil.
 

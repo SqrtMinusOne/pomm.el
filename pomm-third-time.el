@@ -90,21 +90,21 @@ of period.  The format is as follows:
   "The current state of the Third Time timer.
 
 This is an alist with the following keys:
-- status: either 'stopped or 'running
+- status: either \\='stopped or \\='running
   (having a pause state seems to make little sense here)
 - current: an alist with a current period
 - history: a list with history for today
 - last-changed-time: a timestamp of the last change in status
 - context: a string that describes the current task
 
-'current is an alist with the following keys:
-- kind: either 'work or 'break
+\\='current is an alist with the following keys:
+- kind: either \\='work or \\='break
 - start-time: start timestamp
 - break-time-bank: break time, postpone from previous periods
 - iteration: number of the current iteration
 
-'history is a list of alists with the following keys:
-- kind: same as in 'current
+\\='history is a list of alists with the following keys:
+- kind: same as in \\='current
 - iteration
 - start-time: start timestamp
 - end-time: end timestamp
@@ -678,16 +678,16 @@ The idea of the technique is as follows:
 
 The timer can have two states:
 - Stopped.
-  Can be started with 's' or `pomm-third-time-start'.
+  Can be started with \\='s' or `pomm-third-time-start'.
 - Running.
-  Can be stopped with 'S' or `pomm-third-time-stop'.
+  Can be stopped with \\='S' or `pomm-third-time-stop'.
 
 If the timer is running, the current period type (work or break) can
-be switched by 'b' or `pomm-third-time-switch'.  If the break time
+be switched by \\='b' or `pomm-third-time-switch'.  If the break time
 runs out, the timer automatically switches to work.
 
 The timer supports setting \"context\", for example, a task on which
-you're working on.  It can be set with '-c' or
+you\\='re working on.  It can be set with \\='-c' or
 `pomm-third-time-set-context'.  This is useful together with CSV
 logging, which is enabled if `pomm-third-time-csv-history-file' is
 non-nil.
