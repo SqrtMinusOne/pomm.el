@@ -147,6 +147,8 @@ Then, start the timer (either =pomm= or =pomm-third-time=) and =org-clock-in=, i
 
 Setting =pomm-org-clock-in-immediately= to =nil= "defers" calling =org-clock-in-last= until after any command from the user (via =post-command-hook=). I've added this because I occasionally return to my PC a few minutes after the break ends, so I don't want these minutes to show up in =org-clock=.
 
+Also see [[https://github.com/SqrtMinusOne/pomm.el/issues/13#issuecomment-2216868331][this comment]] ([[https://github.com/SqrtMinusOne/pomm.el/issues/13][#13]]) for an alternative approach.
+
 * Alternatives
 There is a number of packages with a similar purpose, here is a rough comparison of features:
 | Package                | 3rd party integrations | Control method (1)             | Persistent history       | Persistent state                           | Notifications             |
