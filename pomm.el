@@ -209,6 +209,13 @@ Each element of the list is a cons cell, where:
   :group 'pomm
   :type 'hook)
 
+(defcustom pomm-org-clock-in-immediately t
+  "Run `org-clock-in-last' immediately after the break ends.
+
+If nil, the clock in happens after the first command."
+  :group 'pomm
+  :type 'boolean)
+
 (defvar pomm--state nil
   "The current state of the Pomodoro timer.
 
@@ -535,6 +542,37 @@ minor mode."
       (remove-hook 'pomm-on-tick-hook #'force-mode-line-update)
       (remove-hook 'pomm-on-status-changed-hook #'pomm-update-mode-line-string)
       (remove-hook 'pomm-on-status-changed-hook #'force-mode-line-update))))
+
+(defvar pomm--sync-org-clock-was-stopped nil
+  "If t, `pomm--sync-org-clock' had stopped `org-clock.")
+
+(defun pomm--org-clock-in-last-after-action ()
+  "Run `org-clock-in-last' after some action by the user.
+
+This exists because I sometimes return to PC after a the break ends."
+  (add-hook 'post-command-hook #'pomm--org-clock-in-last-and-remove-from-hook))
+
+(defun pomm--org-clock-in-last-and-remove-from-hook ()
+  "Run `org-clock-in-last' and remove self from the `post-command-hook'."
+  (org-clock-in-last)
+  (remove-hook 'post-command-hook #'pomm--org-clock-in-last-and-remove-from-hook))
+
+(defun pomm--sync-org-clock ()
+  "Sync org-clock with the pomodoro timer."
+  (let* ((status (alist-get 'status pomm--state))
+         (kind (alist-get 'kind (alist-get 'current pomm--state)))
+         (active-p (and (eq kind 'work)
+                        (eq status 'running)))
+         (resume-next-time-p (not (eq status 'stopped))))
+    (cond
+     ((and active-p (not org-clock-current-task)
+           pomm--sync-org-clock-was-stopped)
+      (if pomm-org-clock-in-immediately
+          (org-clock-in-last)
+        (pomm--org-clock-in-last-after-action)))
+     ((and (not active-p) org-clock-current-task)
+      (org-clock-out)
+      (setq pomm--sync-org-clock-was-stopped resume-next-time-p)))))
 
 ;;;###autoload
 (defun pomm-start ()

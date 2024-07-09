@@ -438,6 +438,23 @@ Take a look at the `pomm-third-time' function for more details."
   (setf (alist-get 'context pomm-third-time--state)
         (prin1-to-string (read-minibuffer "Context: " (current-word)))))
 
+(defun pomm-third-time--sync-org-clock ()
+  "Sync org-clock with the pomodoro timer."
+  (let* ((status (alist-get 'status pomm-third-time--state))
+         (kind (alist-get 'kind (alist-get 'current pomm-third-time--state)))
+         (active-p (and (eq kind 'work)
+                        (eq status 'running)))
+         (resume-next-time-p (not (eq status 'stopped))))
+    (cond
+     ((and active-p (not org-clock-current-task)
+           pomm--sync-org-clock-was-stopped)
+      (if pomm-org-clock-in-immediately
+          (org-clock-in-last)
+        (pomm--org-clock-in-last-after-action)))
+     ((and (not active-p) org-clock-current-task)
+      (org-clock-out)
+      (setq pomm--sync-org-clock-was-stopped resume-next-time-p)))))
+
 ;;;###autoload
 (defun pomm-third-time-start-with-context ()
   "Prompt for context call call `pomm-third-time-start'."

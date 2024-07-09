@@ -134,6 +134,18 @@ To customize timestamp, set the =pomm-csv-history-file-timestamp-format= variabl
 #+end_src
 
 The format is the same as in =format-time-string=.
+** Usage with =org-clock=
+The package can be used with [[https://orgmode.org/manual/Clocking-commands.html][org-clock]] in the following way. Set up these two hooks:
+
+#+begin_src emacs-lisp
+(add-hook 'pomm-on-status-changed-hook #'pomm--sync-org-clock)
+(add-hook 'pomm-third-time-on-status-changed-hook
+          #'pomm-third-time--sync-org-clock
+#+end_src
+
+Then, start the timer (either =pomm= or =pomm-third-time=) and =org-clock-in=, in whichever order. The package will call =org-clock-out= when a break starts and =org-clock-in-last= when it ends.
+
+Setting =pomm-org-clock-in-immediately= to =nil= "defers" calling =org-clock-in-last= until after any command from the user (via =post-command-hook=). I've added this because I occasionally return to my PC a few minutes after the break ends, so I don't want these minutes to show up in =org-clock=.
 
 * Alternatives
 There is a number of packages with a similar purpose, here is a rough comparison of features:
