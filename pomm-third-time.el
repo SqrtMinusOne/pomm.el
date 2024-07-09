@@ -35,6 +35,11 @@
 (require 'transient)
 (require 'calc)
 
+;; XXX optional dependency on org-clock
+(declare-function org-clock-in-last "org-clock")
+(declare-function org-clock-out "org-clock")
+(defvar org-clock-current-task)
+
 (defgroup pomm-third-time nil
   "Third Time timer implementation."
   :group 'pomm)
@@ -249,7 +254,9 @@ return it, otherwise, return a value like a calc error."
    0))
 
 (defun pomm-third-time--total-time (&optional kind)
-  "Get total time spent in `state` in the current iteration."
+  "Get total time spent in `state` in the current iteration.
+
+KIND is the same as in `pomm-third-time--state'."
   (let* ((kind (if kind kind 'work))
          (iteration (alist-get 'iteration
                                (alist-get 'current pomm-third-time--state)))

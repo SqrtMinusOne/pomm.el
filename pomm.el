@@ -46,8 +46,8 @@
 (require 'transient)
 
 ;; XXX optional dependency on org-clock
-(declare-function "org-clock-in-last" "org-clock")
-(declare-function "org-clock-out" "org-clock")
+(declare-function org-clock-in-last "org-clock")
+(declare-function org-clock-out "org-clock")
 (defvar org-clock-current-task)
 
 (defgroup pomm nil
