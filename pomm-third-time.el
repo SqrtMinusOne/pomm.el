@@ -191,7 +191,7 @@ If the variable is nil, the function does nothing."
              (symbol-name (alist-get 'kind (alist-get 'current pomm-third-time--state)))
              (or (alist-get 'iteration (alist-get 'current pomm-third-time--state)) 0)
              (pomm-third-time--break-time)
-             (alist-get 'context pomm--state))
+             (alist-get 'context pomm-third-time--state))
      nil pomm-third-time-csv-history-file 'append 1)))
 
 (transient-define-prefix pomm-third-time-reset ()
